@@ -3168,6 +3168,248 @@ function confirmBankImport(){
 }
 
 // ═══════════════════════════════════════════════════════════
+// PERSISTENCE — localStorage auto-save + JSON export/import
+// ═══════════════════════════════════════════════════════════
+const STORAGE_KEY = 'mizan_v5_data';
+let _lastSaveTime = null;
+let _autoSaveTimer = null;
+
+// Collect everything into one snapshot object
+function getSnapshot() {
+  return {
+    version: 5,
+    savedAt: new Date().toISOString(),
+    CATS, BUDGETS, OBLIGATIONS, ACCOUNTS, INCOME,
+    TRANSACTIONS, INSIGHT_HISTORY,
+  };
+}
+
+// Restore from snapshot — validates version and structure
+function applySnapshot(snap) {
+  if (!snap || snap.version < 4) return false;
+  try {
+    if (Array.isArray(snap.CATS) && snap.CATS.length)        CATS          = snap.CATS;
+    if (snap.BUDGETS?.fixed)                                  BUDGETS       = snap.BUDGETS;
+    if (Array.isArray(snap.OBLIGATIONS))                      OBLIGATIONS   = snap.OBLIGATIONS;
+    if (snap.ACCOUNTS?.banks)                                 ACCOUNTS      = snap.ACCOUNTS;
+    if (snap.INCOME)                                          INCOME        = snap.INCOME;
+    if (Array.isArray(snap.TRANSACTIONS))                     TRANSACTIONS  = snap.TRANSACTIONS;
+    if (Array.isArray(snap.INSIGHT_HISTORY))                  INSIGHT_HISTORY = snap.INSIGHT_HISTORY;
+    return true;
+  } catch(e) { return false; }
+}
+
+// Save to localStorage — called after every mutation
+function saveToStorage(manual=false) {
+  try {
+    const snap = JSON.stringify(getSnapshot());
+    localStorage.setItem(STORAGE_KEY, snap);
+    _lastSaveTime = new Date();
+    if (manual) {
+      toast('Data saved ✓');
+      renderSaveStatus();
+    }
+  } catch(e) {
+    if (manual) toast('Save failed: ' + e.message, true);
+  }
+}
+
+// Debounced auto-save — fires 1.5s after last change
+function scheduleSave() {
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => {
+    saveToStorage(false);
+    scheduleDriveSync();   // also sync to Drive if connected
+  }, 1500);
+}
+
+// Load from localStorage on startup
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const snap = JSON.parse(raw);
+    return applySnapshot(snap);
+  } catch(e) { return false; }
+}
+
+// Export as downloadable JSON file
+function exportData() {
+  const snap = JSON.stringify(getSnapshot(), null, 2);
+  const date = new Date().toISOString().slice(0,10);
+  // Use data: URI — works in artifact sandbox where blob URLs are blocked
+  const uri = 'data:application/json;charset=utf-8,' + encodeURIComponent(snap);
+  // Try direct download first; fall back to modal with copy textarea
+  try {
+    const a = document.createElement('a');
+    a.href = uri;
+    a.download = 'mizan-backup-' + date + '.json';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('Backup exported ✓');
+  } catch(e) {
+    showExportModal(snap, 'mizan-backup-' + date + '.json', 'JSON Backup');
+  }
+  // Always also show the modal so artifact users can copy
+  showExportModal(snap, 'mizan-backup-' + date + '.json', 'JSON Backup');
+}
+
+function showExportModal(text, filename, label) {
+  document.getElementById('em-title').textContent = 'Export ' + label;
+  document.getElementById('em-body').innerHTML = `
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.7">
+      Copy the content below and paste it into a <strong>.json</strong> file on your device, 
+      or right-click the link below and choose <em>Save link as…</em>
+    </div>
+    <a href="data:application/json;charset=utf-8,${encodeURIComponent(text)}" 
+       download="${filename}" 
+       style="display:inline-block;margin-bottom:10px;color:var(--accent);font-size:13px;font-weight:500">
+      ⬇ Right-click → Save link as "${filename}"
+    </a>
+    <textarea style="width:100%;height:180px;font-family:monospace;font-size:11px;resize:vertical;border:1px solid var(--border);border-radius:var(--rs);padding:8px;background:var(--surface2);" readonly onclick="this.select()">${text.replace(/</g,'&lt;')}</textarea>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Click the text area to select all, then copy (Ctrl+C / Cmd+C)</div>`;
+  document.getElementById('em-delete').style.display = 'none';
+  document.getElementById('em-save').style.display = 'none';
+  document.getElementById('entity-modal').classList.add('show');
+  // Re-show save button when modal closes
+  document.getElementById('entity-modal').addEventListener('click', function restore(e) {
+    if(e.target === this) {
+      document.getElementById('em-save').style.display = '';
+      this.removeEventListener('click', restore);
+    }
+  });
+}
+
+// Import from JSON file
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const snap = JSON.parse(e.target.result);
+      const savedAt = snap.savedAt ? new Date(snap.savedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'unknown date';
+      const txCount = snap.TRANSACTIONS?.length || 0;
+      // Show confirmation
+      document.getElementById('em-title').textContent = 'Import Backup?';
+      document.getElementById('em-body').innerHTML = `<div style="font-size:14px;line-height:1.8;color:var(--muted)">
+        This backup was saved on <strong style="color:var(--text)">${savedAt}</strong> and contains:<br>
+        • ${txCount} transactions<br>
+        • ${snap.ACCOUNTS?.banks?.length||0} bank accounts<br>
+        • ${snap.OBLIGATIONS?.length||0} obligations<br>
+        • ${snap.INSIGHT_HISTORY?.length||0} AI insights<br><br>
+        <strong style="color:var(--red)">All current data will be replaced.</strong>
+      </div>`;
+      document.getElementById('em-delete').style.display = 'none';
+      document.getElementById('em-save').textContent = 'Yes, Import';
+      document.getElementById('em-save').className = 'btn bp';
+      document.getElementById('em-save').onclick = () => {
+        const ok = applySnapshot(snap);
+        closeModal('entity-modal');
+        document.getElementById('em-save').textContent = 'Save';
+        document.getElementById('em-save').className = 'btn bp';
+        if (ok) {
+          saveToStorage(false);
+          renderDashboard();
+          document.getElementById('import-status').textContent = '✓ Imported successfully';
+          toast('Backup imported ✓');
+        } else {
+          toast('Import failed — invalid file', true);
+        }
+        event.target.value = '';
+      };
+      document.getElementById('entity-modal').classList.add('show');
+    } catch(err) {
+      toast('Could not read file: ' + err.message, true);
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Render the save status panel
+function renderSaveStatus() {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  const txCount = TRANSACTIONS.length;
+  const hasStorage = !!localStorage.getItem(STORAGE_KEY);
+  const lastSaveStr = _lastSaveTime
+    ? _lastSaveTime.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+    : (hasStorage ? 'loaded from previous session' : 'not yet saved');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="width:10px;height:10px;border-radius:50%;background:${hasStorage?'var(--accent)':'var(--amber)'}"></span>
+      <span style="font-weight:500;color:var(--text)">${hasStorage?'Auto-save active':'No saved data yet'}</span>
+    </div>
+    Last saved: <strong>${lastSaveStr}</strong><br>
+    Transactions stored: <strong>${txCount}</strong><br>
+    Data saves automatically after every change.<br>
+    Use Export to create a portable backup file.
+  `;
+  // Storage usage
+  const usage = document.getElementById('storage-usage');
+  if (usage) {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const kb = raw ? (raw.length / 1024).toFixed(1) : '0';
+    usage.innerHTML = `localStorage: <strong>${kb} KB</strong> used by Mizan (limit ~5 MB). You have approximately <strong>${Math.floor((5120 - parseFloat(kb)) / (parseFloat(kb) || 1) * txCount)} more transactions</strong> of capacity.`;
+  }
+}
+
+// Patch all mutating functions to trigger auto-save after they run
+// We wrap the key render functions that are called after data changes
+const _origConfirmAddTx = confirmAddTx;
+confirmAddTx = function() { _origConfirmAddTx.apply(this, arguments); scheduleSave(); };
+
+const _origDeleteTx = deleteTx;
+deleteTx = function(id) { _origDeleteTx(id); scheduleSave(); };
+const _origConfirmDeleteTx = confirmDeleteTx;
+confirmDeleteTx = function() { _origConfirmDeleteTx(); scheduleSave(); };
+
+const _origMarkPaid = markPaid;
+markPaid = function(id) { _origMarkPaid(id); scheduleSave(); renderHub(); };
+
+const _origSaveEntity = saveEntity;
+saveEntity = function() { _origSaveEntity.apply(this, arguments); scheduleSave(); };
+
+const _origDeleteEntity = deleteEntity;
+deleteEntity = function() { _origDeleteEntity.apply(this, arguments); scheduleSave(); };
+
+const _origSaveObligation = saveObligation;
+saveObligation = function() { _origSaveObligation.apply(this, arguments); scheduleSave(); };
+
+const _origDeleteObligation = deleteObligation;
+deleteObligation = function() { _origDeleteObligation.apply(this, arguments); scheduleSave(); };
+
+const _origSaveIncome = saveIncome;
+saveIncome = function() { _origSaveIncome.apply(this, arguments); scheduleSave(); };
+
+const _origAddReceiptTx = addReceiptTx;
+addReceiptTx = function() { _origAddReceiptTx.apply(this, arguments); scheduleSave(); };
+
+// importStmtTx calls scheduleSave() directly
+
+const _origSaveBudgetModal = saveBudgetModal;
+saveBudgetModal = function() { _origSaveBudgetModal.apply(this, arguments); scheduleSave(); };
+
+const _origDeleteBudgetModal = deleteBudgetModal;
+deleteBudgetModal = function() { _origDeleteBudgetModal.apply(this, arguments); scheduleSave(); };
+
+// Also patch askInsight to save history after each exchange
+const _origAskInsight = askInsight;
+askInsight = async function() { await _origAskInsight.apply(this, arguments); scheduleSave(); renderHub(); };
+
+// Also patch switchAdmin to show save status when data tab opens
+const _origSwitchAdmin = switchAdmin;
+switchAdmin = function(tab) {
+  _origSwitchAdmin(tab);
+  if (tab === 'data') { renderSaveStatus(); renderDriveStatus(); }
+  if (tab === 'api') { renderApiPanel(); }
+};
+
+
+// ═══════════════════════════════════════════════════════════
 // GOOGLE AUTH + DRIVE ENGINE
 // ═══════════════════════════════════════════════════════════
 
