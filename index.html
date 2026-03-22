@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"> 
+<meta charset="UTF-8">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mizan — Personal Finance</title>
@@ -1934,11 +1934,36 @@ function renderNetWorth(){
 // ═══════════════════════════════════════════════════════════
 // TRANSACTIONS
 // ═══════════════════════════════════════════════════════════
-function renderTransactions(){
+function populateCatDropdowns(){
+  // Filter dropdown on transactions page
   const cf=document.getElementById('f-cat');
-  if(cf.options.length===1)CATS.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.icon+' '+c.name;cf.appendChild(o);});
+  if(cf){
+    const prev=cf.value;
+    cf.innerHTML='<option value="">All Categories</option>';
+    CATS.forEach(c=>{
+      const o=document.createElement('option');
+      o.value=c.id; o.textContent=c.icon+' '+c.name;
+      cf.appendChild(o);
+    });
+    if(prev) cf.value=prev;
+  }
+  // Add/Edit transaction modal category select
   const nc=document.getElementById('nt-cat');
-  if(nc.options.length===0)CATS.filter(c=>c.id!=='income').forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.icon+' '+c.name;nc.appendChild(o);});
+  if(nc){
+    const prev=nc.value;
+    nc.innerHTML='';
+    CATS.filter(c=>c.id!=='income').forEach(c=>{
+      const o=document.createElement('option');
+      o.value=c.id; o.textContent=c.icon+' '+c.name;
+      nc.appendChild(o);
+    });
+    if(prev) nc.value=prev;
+  }
+}
+
+function renderTransactions(){
+  // Always rebuild category dropdowns so new categories appear immediately
+  populateCatDropdowns();
   const all=TRANSACTIONS,inc=all.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),exp=all.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   document.getElementById('tx-metrics').innerHTML=`
     <div class="metric"><div class="ml">Total Income</div><div class="mv green">${fmt(inc)}</div><div class="ms">${all.filter(t=>t.type==='income').length} txns</div></div>
@@ -2115,6 +2140,7 @@ function updatePrepaidCost(){
 
 function openTxModal(){
   editingTxId=null;
+  populateCatDropdowns();
   document.getElementById('tx-modal-title').textContent='Add Transaction';
   document.getElementById('tx-modal-save').textContent='Add';
   document.getElementById('tx-modal-delete').style.display='none';
@@ -2874,7 +2900,8 @@ function saveEntity(){
   else if(type==='investment'){const obj={id:isNew?'i'+Date.now():id,name:g('em-name'),platform:g('em-platform'),value:gn('em-val'),monthly_return:gn('em-ret')};if(isNew)ACCOUNTS.investments.push(obj);else Object.assign(ACCOUNTS.investments.find(i=>i.id===id)||{},obj);}
   else if(type==='property'){const obj={id:isNew?'p'+Date.now():id,name:g('em-name'),location:g('em-loc'),est_value_pkr:gn('em-pkrval'),est_value_aed:gn('em-aedval'),used_by:g('em-usedby'),status:g('em-status')};if(isNew)ACCOUNTS.properties.push(obj);else Object.assign(ACCOUNTS.properties.find(p=>p.id===id)||{},obj);}
   else if(type==='liability'){const obj={id:isNew?'l'+Date.now():id,name:g('em-name'),amount:gn('em-amt2')};if(isNew)ACCOUNTS.liabilities.push(obj);else Object.assign(ACCOUNTS.liabilities.find(l=>l.id===id)||{},obj);}
-  else if(type==='category'){const cid=g('em-catid'),cname=g('em-catname'),cicon=g('em-caticon'),cess=g('em-catess')==='true';if(!cid||!cname){toast('ID and name required',true);return;}if(isNew)CATS.push({id:cid,name:cname,icon:cicon,color:'#7a766e',bg:'#f0ede6',essential:cess});else{const c=CATS.find(x=>x.id===id);if(c){c.name=cname;c.icon=cicon;c.essential=cess;}}}
+  else if(type==='category'){const cid=g('em-catid'),cname=g('em-catname'),cicon=g('em-caticon'),cess=g('em-catess')==='true';if(!cid||!cname){toast('ID and name required',true);return;}if(isNew)CATS.push({id:cid,name:cname,icon:cicon,color:'#7a766e',bg:'#f0ede6',essential:cess});else{const c=CATS.find(x=>x.id===id);if(c){c.name=cname;c.icon=cicon;c.essential=cess;}}
+  populateCatDropdowns();}
   closeModal('entity-modal');renderAdmin(document.querySelector('.admin-tab.active')?.getAttribute('onclick')?.match(/'(\w+)'/)?.[1]||'accounts');toast('Saved ✓');
 }
 function deleteEntity(){
