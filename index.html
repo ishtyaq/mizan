@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-<head> 
+<head>
 <meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mizan — Personal Finance</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
@@ -894,8 +895,8 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
       <div class="field">
         <label class="lbl">API Key</label>
         <div class="fi mt4" style="gap:8px;">
-          <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." style="flex:1;font-family:monospace;font-size:12px;">
-          <button class="btn bo bsm" onclick="toggleApiKeyVisibility()" id="api-key-toggle">Show</button>
+          <form onsubmit="return false" style="display:contents"><input type="password" id="api-key-input" placeholder="sk-ant-api03-..." style="flex:1;font-family:monospace;font-size:12px;">
+          <button class="btn bo bsm" onclick="toggleApiKeyVisibility()" id="api-key-toggle">Show</button></form>
         </div>
       </div>
       <div class="fi mt12" style="gap:9px;flex-wrap:wrap;">
@@ -3416,9 +3417,7 @@ switchAdmin = function(tab) {
 const DRIVE_CLIENT_ID_KEY = 'mizan_goog_client_id';
 const DRIVE_FILE_ID_KEY   = 'mizan_goog_file_id';
 const DRIVE_FILE_NAME     = 'mizan-backup.json';
-const DRIVE_SCOPE         = 'https://www.googleapis.com/auth/drive.file '
-                          + 'https://www.googleapis.com/auth/userinfo.email '
-                          + 'https://www.googleapis.com/auth/userinfo.profile';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
 let googleClientId  = localStorage.getItem(DRIVE_CLIENT_ID_KEY) || '';
 let googleToken     = null;   // access token — in memory only
@@ -3601,7 +3600,19 @@ async function driveApiFetch(url, opts={}){
   if(!googleToken) throw new Error('Not signed in');
   const headers={'Authorization':'Bearer '+googleToken,...(opts.headers||{})};
   const resp=await fetch(url,{...opts,headers});
-  if(resp.status===401){ googleToken=null; throw new Error('Token expired — please sign in again'); }
+  if(resp.status===401){
+    googleToken=null;
+    throw new Error('Token expired — please sign in again');
+  }
+  if(resp.status===403){
+    // Try to get error details
+    let reason='';
+    try{ const d=await resp.clone().json(); reason=d.error?.message||d.error?.status||''; }catch(e){}
+    if(reason.includes('disabled') || reason.includes('not been used') || reason.includes('API')){
+      throw new Error('Google Drive API is not enabled. Go to console.cloud.google.com → APIs & Services → Library → search "Google Drive API" → Enable it.');
+    }
+    throw new Error('Drive access denied (403). Make sure Google Drive API is enabled in your Google Cloud project. '+reason);
+  }
   return resp;
 }
 
@@ -3645,7 +3656,36 @@ async function driveLoadOnSignIn(){
     const raw=await driveReadFile(fileId);
     const snap=JSON.parse(raw);
     return applySnapshot(snap);
-  }catch(e){ return false; }
+  }catch(e){
+    if(e.message&&e.message.includes('Drive API is not enabled')){
+      // Show actionable error on auth screen
+      hideAuthScreen();
+      setTimeout(()=>{
+        document.getElementById('auth-screen').style.display='flex';
+        document.getElementById('auth-signin-view').style.display='none';
+        document.getElementById('auth-loading-view').style.display='none';
+        document.getElementById('auth-setup-view').style.display='none';
+        // Show a custom error panel
+        const wrap=document.querySelector('#auth-screen .pin-setup-wrap')||document.querySelector('#auth-screen >div');
+        if(wrap){
+          wrap.innerHTML='<div class="pin-logo">Mizan</div>'
+            +'<div style="max-width:320px;text-align:left;margin-top:16px;">'
+            +'<div style="background:var(--redl);border-radius:var(--rs);padding:14px;margin-bottom:16px;font-size:13px;color:var(--red);line-height:1.8;">'
+            +'<strong>Google Drive API not enabled</strong><br>'
+            +'You signed in successfully but Drive access is blocked.</div>'
+            +'<div style="font-size:13px;color:var(--muted);line-height:2;margin-bottom:16px;">'
+            +'1. Go to <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" style="color:var(--accent)">Google Drive API page</a><br>'
+            +'2. Click <strong>Enable</strong><br>'
+            +'3. Wait 1 minute, then come back and sign in again</div>'
+            +'<button class="btn bp" onclick="googleSignIn()" style="width:100%">Try Again</button>'
+            +'<button class="btn bg_" onclick="authSkip()" style="width:100%;margin-top:8px;">Use without Drive</button>'
+            +'</div>';
+        }
+      },100);
+    }
+    console.error('Drive load error:', e.message);
+    return false;
+  }
 }
 
 async function driveSyncNow(silent=false){
