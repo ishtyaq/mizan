@@ -3633,11 +3633,13 @@ async function driveCreateFile(content){
 }
 
 async function driveUpdateFile(fileId,content){
+  if(!fileId||fileId==='undefined'||fileId==='null') throw new Error('Invalid file ID for update: '+fileId);
   const resp=await driveApiFetch('https://www.googleapis.com/upload/drive/v3/files/'+fileId+'?uploadType=media&fields=id,name,modifiedTime',{method:'PATCH',headers:{'Content-Type':'application/json'},body:content});
   return await resp.json();
 }
 
 async function driveReadFile(fileId){
+  if(!fileId||fileId==='undefined'||fileId==='null') throw new Error('Invalid file ID for read: '+fileId);
   const resp=await driveApiFetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media');
   return await resp.text();
 }
@@ -3645,14 +3647,18 @@ async function driveReadFile(fileId){
 // Load data from Drive on sign-in — returns true if file was found
 async function driveLoadOnSignIn(){
   try{
-    let fileId=driveFileId;
-    if(!fileId){
+    let fileId=driveFileId||'';
+    // Validate cached fileId
+    if(!fileId||fileId==='undefined'){
+      driveFileId='';
+      localStorage.removeItem(DRIVE_FILE_ID_KEY);
       const existing=await driveFindFile();
-      if(!existing) return false;
+      if(!existing||!existing.id) return false; // no backup yet — first time
       fileId=existing.id;
       driveFileId=fileId;
       localStorage.setItem(DRIVE_FILE_ID_KEY,fileId);
     }
+    if(!fileId||fileId==='undefined') return false;
     const raw=await driveReadFile(fileId);
     const snap=JSON.parse(raw);
     return applySnapshot(snap);
@@ -3691,22 +3697,38 @@ async function driveLoadOnSignIn(){
 async function driveSyncNow(silent=false){
   if(driveSyncing||!googleToken) return;
   driveSyncing=true;
-  const content=JSON.stringify(getSnapshot());
+  const snap=JSON.stringify(getSnapshot());
   try{
-    let fileId=driveFileId;
-    if(!fileId){
+    let fileId=driveFileId||'';
+    // Always verify fileId is valid before using it
+    if(!fileId||fileId==='undefined'){
+      // Clear any stale value
+      driveFileId='';
+      localStorage.removeItem(DRIVE_FILE_ID_KEY);
+      // Look for existing file
       const existing=await driveFindFile();
-      if(existing){ fileId=existing.id; }
-      else{ const created=await driveCreateFile(content); fileId=created.id; }
+      if(existing&&existing.id){
+        fileId=existing.id;
+      } else {
+        // Create new file
+        const created=await driveCreateFile(snap);
+        if(!created||!created.id) throw new Error('Drive create returned no file ID');
+        fileId=created.id;
+      }
       driveFileId=fileId;
       localStorage.setItem(DRIVE_FILE_ID_KEY,fileId);
     }
-    await driveUpdateFile(fileId,content);
+    if(!fileId||fileId==='undefined') throw new Error('Could not resolve Drive file ID');
+    await driveUpdateFile(fileId,snap);
     driveLastSync=new Date();
     if(!silent) toast('Synced to Drive ✓');
     renderDriveStatusPanel();
   }catch(e){
+    // Clear cached fileId on error so next sync retries find/create
+    driveFileId='';
+    localStorage.removeItem(DRIVE_FILE_ID_KEY);
     if(!silent) toast('Drive sync failed: '+e.message,true);
+    console.error('driveSyncNow error:',e);
   }
   driveSyncing=false;
 }
