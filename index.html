@@ -395,7 +395,16 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
 
   <!-- Fast expense entry -->
   <div class="card sg" id="today-quick-add">
-    <div class="ct">Quick Add Expense</div>
+    <!-- Date navigator -->
+    <div class="fb mb12">
+      <div class="ct" style="margin:0">Quick Add Expense</div>
+      <div class="period-nav">
+        <button class="pnbtn" onclick="changeTodayDate(-1)">‹</button>
+        <span class="pnlbl" id="today-date-lbl" style="min-width:110px;font-size:13px;"></span>
+        <button class="pnbtn" onclick="changeTodayDate(1)">›</button>
+        <button class="btn bsm bg_" onclick="resetTodayDate()" id="today-date-reset" style="display:none;">Today</button>
+      </div>
+    </div>
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
       <div style="flex:1;min-width:120px;">
         <label class="lbl">Amount (AED)</label>
@@ -406,8 +415,14 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
         <input type="text" id="today-desc" placeholder="e.g. Carrefour" style="margin-top:4px;">
       </div>
     </div>
-    <!-- Category quick-pick buttons -->
-    <div class="lbl mb8">Category</div>
+    <!-- Category quick-pick buttons — all categories, essential flagged -->
+    <div class="fb mb8">
+      <div class="lbl" style="margin:0">Category</div>
+      <div class="fi" style="gap:6px;">
+        <span class="chip active" id="today-cat-filter-all" onclick="setTodayCatFilter('all',this)" style="font-size:11px;padding:3px 9px;">All</span>
+        <span class="chip" id="today-cat-filter-ess" onclick="setTodayCatFilter('essential',this)" style="font-size:11px;padding:3px 9px;">Essential</span>
+      </div>
+    </div>
     <div id="today-cat-grid" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;"></div>
     <!-- Method -->
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -553,6 +568,10 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
       </table>
     </div>
     <div id="tx-empty" style="display:none;text-align:center;padding:24px;color:var(--muted);font-size:13px;">No transactions match filters</div>
+  </div>
+  <div class="card sg">
+    <div class="fb mb10"><div class="ct" style="margin:0">Daily Spend</div><span class="sm muted" id="tx-daily-range"></span></div>
+    <div id="tx-daily-chart" style="overflow-x:auto;"></div>
   </div>
   <div class="g2 sg">
     <div class="card"><div class="ct">Spend by Category</div><div id="tx-bycat"></div></div>
@@ -1124,6 +1143,8 @@ let projHorizon=6;
 let receiptB64=null,parsedReceipt=null,parsedStmtTx=[];
 let editingTxId=null;
 let todaySelectedCat='grocery';
+let todayDate=new Date().toISOString().split('T')[0];
+let todayCatFilter='all';
 let entityModalCtx=null,budgetModalCtx=null,oblModalCtx=null;
 let dismissedNudges=new Set();
 
@@ -1493,23 +1514,59 @@ function periodLabel(mode,m,y){return mode==='monthly'?MN[m]+' '+y:mode==='quart
 // ═══════════════════════════════════════════════════════════
 // TODAY PAGE
 // ═══════════════════════════════════════════════════════════
-function renderToday(){
-  const now=new Date();
-  const hour=now.getHours();
-  const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
-  const fixedGreeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
-  const dateStr=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('today-greeting').textContent=fixedGreeting+' 👋';
-  document.getElementById('today-date-sub').textContent=dateStr;
-
-  // Category quick-pick grid — show top expense categories
-  const topCats=CATS.filter(c=>c.id!=='income'&&c.id!=='other'&&c.id!=='transfer').slice(0,12);
-  document.getElementById('today-cat-grid').innerHTML=topCats.map(c=>`
+function changeTodayDate(d){
+  const dt=new Date(todayDate+'T00:00:00');
+  dt.setDate(dt.getDate()+d);
+  todayDate=dt.toISOString().split('T')[0];
+  renderToday();
+}
+function resetTodayDate(){
+  todayDate=new Date().toISOString().split('T')[0];
+  renderToday();
+}
+function setTodayCatFilter(f, el){
+  todayCatFilter=f;
+  document.querySelectorAll('[id^="today-cat-filter-"]').forEach(c=>c.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderTodayCatGrid();
+}
+function renderTodayCatGrid(){
+  const cats=todayCatFilter==='essential'
+    ? CATS.filter(c=>c.essential&&c.id!=='income'&&c.id!=='transfer')
+    : CATS.filter(c=>c.id!=='income'&&c.id!=='transfer');
+  // Ensure selected cat is in current filter — if not, pick first available
+  if(!cats.find(c=>c.id===todaySelectedCat)&&cats.length){
+    todaySelectedCat=cats[0].id;
+  }
+  const grid=document.getElementById('today-cat-grid');
+  if(!grid) return;
+  grid.innerHTML=cats.map(c=>`
     <button onclick="selectTodayCat('${c.id}',this)" class="today-cat-btn"
-      style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 10px;border-radius:var(--rs);border:1.5px solid ${c.id===todaySelectedCat?c.color:'var(--border)'};background:${c.id===todaySelectedCat?c.bg:'white'};cursor:pointer;transition:all .15s;min-width:60px;">
+      style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 10px;border-radius:var(--rs);border:1.5px solid ${c.id===todaySelectedCat?c.color:'var(--border)'};background:${c.id===todaySelectedCat?c.bg:'white'};cursor:pointer;transition:all .15s;min-width:60px;position:relative;">
       <span style="font-size:20px">${c.icon}</span>
       <span style="font-size:10px;color:${c.id===todaySelectedCat?c.color:'var(--muted)'};font-weight:${c.id===todaySelectedCat?'600':'400'};white-space:nowrap;max-width:55px;overflow:hidden;text-overflow:ellipsis">${c.name}</span>
+      ${c.essential?'<span style="position:absolute;top:2px;right:3px;font-size:8px;color:var(--accent)">●</span>':''}
     </button>`).join('');
+}
+
+function renderToday(){
+  const now=new Date();
+  const selectedDate=new Date(todayDate+'T00:00:00');
+  const isToday=todayDate===now.toISOString().split('T')[0];
+  const hour=now.getHours();
+  const fixedGreeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
+  const dateStr=selectedDate.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('today-greeting').textContent=(isToday?fixedGreeting+' 👋':selectedDate.toLocaleDateString('en-GB',{weekday:'long'}));
+  document.getElementById('today-date-sub').textContent=dateStr;
+
+  // Date navigator label + reset button
+  const dateLbl=document.getElementById('today-date-lbl');
+  if(dateLbl) dateLbl.textContent=isToday?'Today':selectedDate.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const resetBtn=document.getElementById('today-date-reset');
+  if(resetBtn) resetBtn.style.display=isToday?'none':'block';
+
+  // Category grid
+  renderTodayCatGrid();
 
   // Today's metrics
   const {m,y}=curPeriod;
@@ -1519,7 +1576,7 @@ function renderToday(){
   const daysInMonth=new Date(y,m+1,0).getDate();
   const daysLeft=daysInMonth-now.getDate();
   const dailyBudget=Math.round((inc-floor.total)/daysInMonth);
-  const todayTx=TRANSACTIONS.filter(t=>t.date===now.toISOString().split('T')[0]&&t.type==='expense');
+  const todayTx=TRANSACTIONS.filter(t=>t.date===todayDate&&t.type==='expense');
   const todaySpend=todayTx.reduce((s,t)=>s+t.amount,0);
   document.getElementById('today-metrics').innerHTML=`
     <div class="metric"><div class="ml">Spent Today</div><div class="mv red">${fmt(todaySpend)}</div><div class="ms">${todayTx.length} transactions</div></div>
@@ -1624,8 +1681,7 @@ function addTodayExpense(){
   const amt=parseFloat(document.getElementById('today-amount').value)||0;
   if(!amt) return toast('Enter an amount first',true);
   const desc=document.getElementById('today-desc').value.trim()||getCat(todaySelectedCat).name;
-  const today=new Date().toISOString().split('T')[0];
-  TRANSACTIONS.push({id:Date.now(),date:today,desc,cat:todaySelectedCat,amount:amt,type:'expense',source:document.getElementById('today-method').value});
+  TRANSACTIONS.push({id:Date.now(),date:todayDate,desc,cat:todaySelectedCat,amount:amt,type:'expense',source:document.getElementById('today-method').value});
   document.getElementById('today-amount').value='';
   document.getElementById('today-desc').value='';
   scheduleSave();
@@ -2007,11 +2063,96 @@ function renderTx(){
     +'</tr>';
   }).join('');
 }
+
+function renderDailyChart(){
+  const el=document.getElementById('tx-daily-chart');
+  const rangeEl=document.getElementById('tx-daily-range');
+  if(!el) return;
+
+  // Get all expense transactions, apply current filters
+  const cat=document.getElementById('f-cat')?.value||'';
+  const src=document.getElementById('f-src')?.value||'';
+  let txs=TRANSACTIONS.filter(t=>t.type==='expense'&&t.type!=='transfer');
+  if(cat) txs=txs.filter(t=>t.cat===cat);
+  if(src) txs=txs.filter(t=>t.source===src);
+
+  if(!txs.length){ el.innerHTML='<div class="sm muted" style="padding:10px 0">No expense data to chart.</div>'; return; }
+
+  // Group by date
+  const byDate={};
+  const byCatDate={};
+  txs.forEach(t=>{
+    byDate[t.date]=(byDate[t.date]||0)+t.amount;
+    if(!byCatDate[t.date]) byCatDate[t.date]={};
+    byCatDate[t.date][t.cat]=(byCatDate[t.date][t.cat]||0)+t.amount;
+  });
+
+  // Get sorted dates — last 30 days or all if fewer
+  const allDates=Object.keys(byDate).sort();
+  const dates=allDates.slice(-30);
+  if(rangeEl) rangeEl.textContent=dates.length>1
+    ? new Date(dates[0]+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+new Date(dates[dates.length-1]+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})
+    : '';
+
+  const maxAmt=Math.max(...dates.map(d=>byDate[d]),1);
+  const barH=80;
+  const today=new Date().toISOString().split('T')[0];
+
+  // Top 4 categories for stacked colouring
+  const catTotals={};
+  txs.forEach(t=>{ catTotals[t.cat]=(catTotals[t.cat]||0)+t.amount; });
+  const topCats=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,4).map(e=>e[0]);
+
+  el.innerHTML='<div style="display:flex;align-items:flex-end;gap:2px;height:'+(barH+48)+'px;overflow-x:auto;padding-bottom:4px;min-width:0;">'
+    +dates.map(d=>{
+      const total=byDate[d];
+      const h=Math.max(Math.round((total/maxAmt)*barH),3);
+      const dt=new Date(d+'T00:00:00');
+      const dow=dt.getDay(); // 0=Sun,6=Sat
+      const isWeekend=dow===0||dow===6;
+      const isToday=d===today;
+      const dayLabel=dt.toLocaleDateString('en-GB',{day:'numeric'});
+      const dowLabel=['Su','Mo','Tu','We','Th','Fr','Sa'][dow];
+
+      // Build stacked segments
+      let stackHtml='';
+      let usedH=0;
+      topCats.forEach((cid,i)=>{
+        const catAmt=(byCatDate[d]&&byCatDate[d][cid])||0;
+        if(!catAmt) return;
+        const segH=Math.round((catAmt/total)*h);
+        if(segH<1) return;
+        const c=getCat(cid);
+        stackHtml='<div style="width:100%;height:'+segH+'px;background:'+c.color+';'+(i===0?'border-radius:3px 3px 0 0;':'')+'"></div>'+stackHtml;
+        usedH+=segH;
+      });
+      // Remaining as gray
+      const remH=h-usedH;
+      if(remH>0) stackHtml='<div style="width:100%;height:'+remH+'px;background:var(--surface2);border-radius:3px 3px 0 0;"></div>'+stackHtml;
+
+      return '<div style="flex:0 0 auto;width:26px;display:flex;flex-direction:column;align-items:center;gap:2px;" title="'+d+': '+fmt(total)+'">'
+        +'<div style="font-size:9px;color:'+(isToday?'var(--accent)':'var(--muted)')+';font-weight:'+(isToday?'600':'400')+'">'+fmt(total).replace('AED ','')+'</div>'
+        +'<div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:'+barH+'px;cursor:default;">'
+          +stackHtml
+        +'</div>'
+        +'<div style="font-size:9px;color:'+(isToday?'var(--accent)':isWeekend?'var(--amber)':'var(--muted)')+';font-weight:'+(isWeekend||isToday?'600':'400')+'">'+dayLabel+'</div>'
+        +'<div style="font-size:8px;color:'+(isWeekend?'var(--amber)':'var(--muted)')+'">'+dowLabel+'</div>'
+      +'</div>';
+    }).join('')
+  +'</div>'
+  // Legend
+  +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">'
+  +topCats.map(cid=>{ const c=getCat(cid); return '<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:2px;background:'+c.color+';display:inline-block"></span>'+c.name+'</span>'; }).join('')
+  +'<span style="font-size:11px;color:var(--muted)"><span style="color:var(--amber);font-weight:600">Bold</span> = weekend</span>'
+  +'</div>';
+}
+
 function renderTxCharts(){
   const spend=allExpByCat(),top=Object.entries(spend).sort((a,b)=>b[1]-a[1]).slice(0,8),mx=Math.max(...top.map(s=>s[1]),1);
   document.getElementById('tx-bycat').innerHTML=top.map(([cid,amt])=>{const c=getCat(cid),bud=[...BUDGETS.fixed,...BUDGETS.variable].find(b=>b.id===cid),over=bud&&amt>bud.budget;return `<div style="padding:7px 0;border-bottom:1px solid var(--border)"><div class="fb" style="margin-bottom:4px"><span style="font-size:13px">${c.icon} ${c.name}</span><span style="font-size:12px;font-weight:500;color:${over?'var(--red)':'var(--text)'}">${fmt(amt)}${bud?` <span class="muted" style="font-weight:400">/ ${fmtN(bud.budget)}</span>`:''}</span></div><div class="ptrak"><div class="pfill" style="width:${Math.round(amt/mx*100)}%;background:${over?'var(--red)':c.color}"></div></div></div>`;}).join('');
   const incByCat={};TRANSACTIONS.filter(t=>t.type==='income').forEach(t=>{incByCat[t.cat]=(incByCat[t.cat]||0)+t.amount;});
   const allC=[...new Set([...Object.keys(spend),...Object.keys(incByCat)])];
+  renderDailyChart();
   renderRecurring();
   document.getElementById('tx-cattable').innerHTML=`<table><thead><tr><th>Category</th><th style="text-align:right">Expense</th><th style="text-align:right">Income</th></tr></thead><tbody>${allC.map(cid=>{const c=getCat(cid),e=spend[cid]||0,i=incByCat[cid]||0;return `<tr><td><span class="badge" style="background:${c.bg};color:${c.color};font-size:11px">${c.icon} ${c.name}</span></td><td style="text-align:right;color:${e?'var(--red)':'var(--muted)'}">${e?fmtN(e):'—'}</td><td style="text-align:right;color:${i?'var(--accent)':'var(--muted)'}">${i?fmtN(i):'—'}</td></tr>`;}).join('')}</tbody></table>`;
 }
