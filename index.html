@@ -27,8 +27,31 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:49;}
 @media(max-width:820px){
   .app{grid-template-columns:1fr;}.sidebar{position:fixed;left:-240px;transition:left .25s;width:220px;}.sidebar.open{left:0;}
-  .sidebar-overlay.show{display:block;}.hamburger{display:flex;}.main{padding:20px 14px;padding-top:56px;}
+  .sidebar-overlay.show{display:block;}.hamburger{display:flex;}.main{padding:16px 12px;padding-top:56px;}
   .metrics{grid-template-columns:1fr 1fr!important;}.g2,.g6535{grid-template-columns:1fr!important;}.g3{grid-template-columns:1fr 1fr!important;}
+  .ph{flex-direction:column;gap:8px;align-items:flex-start;}
+  .period-nav{flex-wrap:nowrap;}
+  table{font-size:12px;}
+  th,td{padding:6px 6px!important;}
+  .modal{max-height:95vh;}
+  .pin-pad{grid-template-columns:repeat(3,64px);gap:8px;}
+  .pin-btn{height:64px;font-size:20px;}
+  /* Hide less important tx table columns on mobile */
+  .tx-col-method{display:none;}
+  /* Today category grid — 4 per row on mobile */
+  #today-cat-grid{gap:5px!important;}
+  #today-cat-grid button{min-width:52px!important;padding:6px 6px!important;}
+  /* Compact paging nav */
+  #tx-page-lbl{font-size:12px!important;}
+  .admin-tabs{font-size:12px;}
+  .admin-tab{padding:7px 10px!important;}
+}
+@media(max-width:480px){
+  .metrics{grid-template-columns:1fr 1fr!important;}
+  .mv{font-size:18px!important;}
+  .g3{grid-template-columns:1fr 1fr!important;}
+  /* Stack the quick-add amount+desc on very small screens */
+  #today-quick-add .fi-row{flex-direction:column!important;}
 }
 .logo{padding:0 16px 16px;border-bottom:1px solid var(--border);}
 .logo-title{font-family:'DM Serif Display',serif;font-size:21px;color:var(--accent);}
@@ -359,12 +382,14 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
   <nav class="nav">
     <div class="ns">Overview</div>
     <div class="ni" onclick="nav('today',this)">⚡ Today</div>
+    <div class="ni" onclick="nav('investments',this)">💹 Investments</div>
     <div class="ni active" onclick="nav('dashboard',this)">◉ Dashboard</div>
     <div class="ni" onclick="nav('networth',this)">◈ Net Worth</div>
     <div class="ni" onclick="nav('obligations',this)">📅 Obligations</div>
     <div class="ns">Money Flow</div>
     <div class="ni" onclick="nav('transactions',this)">↕ Transactions</div>
-    <div class="ni" onclick="nav('income-stmt',this)">📊 Income Statement</div>
+    <div class="ni" onclick="nav('analytics',this)">📊 Analytics</div>
+    <div class="ni" onclick="nav('income-stmt',this)">📈 Income Statement</div>
     <div class="ni" onclick="nav('cashflow',this)">💧 Cash Flow</div>
     <div class="ni" onclick="nav('budget',this)">▦ Budget vs Actual</div>
     <div class="ns">AI Tools</div>
@@ -440,30 +465,22 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
     </div>
   </div>
 
-  <!-- Month status strip -->
-  <div class="metrics" id="today-metrics"></div>
-
-  <!-- Budget pulse — quick overview of variable categories -->
+  <!-- Day metrics -->
+  <div class="metrics sg" id="today-metrics"></div>
+  <!-- Today's transactions + quick savings alert -->
   <div class="g2 sg">
-    <div class="card">
-      <div class="ct">Saving Opportunities</div>
-      <div id="today-opportunities"></div>
-    </div>
     <div class="card">
       <div class="ct">Today's Transactions</div>
       <div id="today-txlist"></div>
-      <div id="today-txlist-empty" class="sm muted" style="padding:8px 0;display:none">No transactions today yet.</div>
+      <div id="today-txlist-empty" class="sm muted" style="padding:8px 0;display:none">No transactions added yet today.</div>
+    </div>
+    <div class="card">
+      <div class="ct">⚡ Pace Alerts</div>
+      <div id="today-opportunities"></div>
     </div>
   </div>
 
-  <!-- Variable budget status -->
-  <div class="card sg">
-    <div class="fb mb12">
-      <div class="ct" style="margin:0">This Month — Variable Spend</div>
-      <span class="sm muted" id="today-days-left"></span>
-    </div>
-    <div id="today-budget-pulse"></div>
-  </div>
+
 </div>
 
 <!-- ══════════════ DASHBOARD ══════════════ -->
@@ -494,7 +511,14 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
       </div>
     </div>
   </div>
-  <div class="card sg"><div class="fb mb12"><div class="ct" style="margin:0">Budget Health</div><button class="btn bo bsm" onclick="nav('budget',null)">Edit</button></div><div id="dash-budget"></div></div>
+  <div class="card sg">
+    <div class="fb mb8">
+      <div class="ct" style="margin:0">Budget Health</div>
+      <button class="btn bo bsm" onclick="nav('budget',null)">Full view →</button>
+    </div>
+    <div id="dash-budget"></div>
+    <div id="dash-budget-summary" class="sm muted mt8"></div>
+  </div>
 </div>
 
 <!-- ══════════════ OBLIGATIONS ══════════════ -->
@@ -543,6 +567,219 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
   <div class="card sg"><div class="ct">Composition</div><div id="nw-bar"></div></div>
 </div>
 
+<!-- ══════════════ INVESTMENTS ══════════════ -->
+<div class="page" id="page-investments">
+  <div class="ph">
+    <div><div class="pt">Investments</div><div class="ps">Factual · Analysis · Projections</div></div>
+    <div class="fi" style="gap:8px;">
+      <button class="btn bp bsm" onclick="openImportInvestmentModal()">⬆ Import</button>
+      <button class="btn bg_ bsm" onclick="debugInvTx()">🔍 Debug</button>
+      <button class="btn bo bsm" onclick="nav('admin',null);setTimeout(()=>switchAdmin('accounts'),50)">Edit ↗</button>
+      <button class="bell-btn" onclick="toggleHub()" title="AI Suggestions"><span>🔔</span></button>
+    </div>
+  </div>
+
+  <!-- Layer tabs -->
+  <div class="tabs sg" style="margin-bottom:0;">
+    <div class="tab active" id="inv-tab-factual"   onclick="switchInvLayer('factual',this)">📋 Factual</div>
+    <div class="tab"        id="inv-tab-analysis"  onclick="switchInvLayer('analysis',this)">📊 Analysis</div>
+    <div class="tab"        id="inv-tab-projection" onclick="switchInvLayer('projection',this)">📈 Projections</div>
+  </div>
+
+  <!-- ── LAYER 1: FACTUAL ── -->
+  <div id="inv-layer-factual">
+    <div class="metrics sg" id="inv-metrics"></div>
+    <div id="inv-cards" class="sg"></div>
+    <div class="card sg">
+      <div class="fb mb10">
+        <div class="ct" style="margin:0">vs Savings Rate</div>
+        <div class="fi" style="gap:6px;">
+          <span class="sm muted">Rate:</span>
+          <input type="number" id="inv-savings-rate" value="4.5" step="0.1" style="width:55px;font-size:12px;padding:3px 6px;" oninput="renderInvestmentComparison()">
+          <span class="sm muted">% p.a.</span>
+        </div>
+      </div>
+      <div id="inv-comparison"></div>
+    </div>
+  </div>
+
+  <!-- ── LAYER 2: ANALYSIS ── -->
+  <div id="inv-layer-analysis" style="display:none;">
+    <!-- Per-account selector -->
+    <div class="card sg">
+      <div class="fb mb12">
+        <div class="ct" style="margin:0">Account</div>
+        <select id="inv-analysis-account" style="font-size:13px;padding:5px 9px;" onchange="renderInvAnalysis()"></select>
+      </div>
+      <!-- Totals -->
+      <div class="metrics" id="inv-analysis-metrics"></div>
+    </div>
+    <!-- Efficiency -->
+    <div class="g2 sg">
+      <div class="card"><div class="ct">Efficiency Metrics</div><div id="inv-efficiency"></div></div>
+      <div class="card"><div class="ct">Monthly Trends</div><div id="inv-monthly-trends" style="overflow-x:auto;"></div></div>
+    </div>
+    <!-- Transaction breakdown -->
+    <div class="card sg">
+      <div class="ct">Transaction Breakdown</div>
+      <div id="inv-tx-breakdown"></div>
+    </div>
+  </div>
+
+  <!-- ── LAYER 3: PROJECTIONS ── -->
+  <div id="inv-layer-projection" style="display:none;">
+    <div class="card sg">
+      <div class="ct mb12">Projection Inputs</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
+        <div class="field">
+          <label class="lbl">Monthly Investment</label>
+          <input type="number" id="proj-monthly" value="500" step="50" oninput="renderInvProjection()">
+          <div class="sm muted mt4">USD / month</div>
+        </div>
+        <div class="field">
+          <label class="lbl">Expected Annual Return</label>
+          <input type="number" id="proj-return" value="7" step="0.5" min="1" max="30" oninput="renderInvProjection()">
+          <div class="sm muted mt4">% per year</div>
+        </div>
+        <div class="field">
+          <label class="lbl">Time Horizon</label>
+          <input type="number" id="proj-years" value="10" step="1" min="1" max="40" oninput="renderInvProjection()">
+          <div class="sm muted mt4">years</div>
+        </div>
+        <div class="field">
+          <label class="lbl">Starting Value</label>
+          <input type="number" id="proj-start" value="7568" step="100" oninput="renderInvProjection()">
+          <div class="sm muted mt4">Current portfolio (USD)</div>
+        </div>
+      </div>
+    </div>
+    <!-- Growth chart -->
+    <div class="card sg">
+      <div class="fb mb10"><div class="ct" style="margin:0">Portfolio Growth</div><span class="sm muted" id="proj-headline"></span></div>
+      <div id="proj-chart" style="overflow-x:auto;"></div>
+    </div>
+    <!-- Milestones -->
+    <div class="card sg">
+      <div class="ct mb10">Milestones</div>
+      <div id="proj-milestones"></div>
+    </div>
+    <!-- Passive income -->
+    <div class="card sg">
+      <div class="ct mb10">Passive Income Targets</div>
+      <div class="sm muted mb12">At your expected return rate, portfolio size needed to generate monthly passive income:</div>
+      <div id="proj-passive"></div>
+    </div>
+  </div>
+
+  <div id="inv-import-area" style="display:none;"></div>
+</div>
+
+<!-- Investment Transaction Modal -->
+<div class="overlay" id="inv-tx-modal">
+  <div class="modal">
+    <div class="modal-title" id="inv-tx-modal-title">Add Transaction</div>
+    <div class="modal-body">
+      <div class="g2" style="gap:10px;">
+        <div class="field">
+          <label class="lbl">Date</label>
+          <input type="date" id="itx-date">
+        </div>
+        <div class="field">
+          <label class="lbl">Type</label>
+          <select id="itx-type" style="width:100%;">
+            <option value="Deposit">Deposit</option>
+            <option value="Withdrawal">Withdrawal</option>
+            <option value="Dividend">Dividend</option>
+            <option value="Fee">Fee</option>
+            <option value="Investment">Investment (funds deployed)</option>
+            <option value="Sell">Sell (assets liquidated)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl">Amount</label>
+          <input type="number" id="itx-amount" step="0.01" placeholder="0.00" oninput="updateItxAED()">
+        </div>
+        <div class="field">
+          <label class="lbl">Currency</label>
+          <select id="itx-currency" style="width:100%;" onchange="updateItxAED()">
+            <option value="USD">USD</option>
+            <option value="AED">AED</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="PKR">PKR</option>
+          </select>
+        </div>
+        <div class="field" style="grid-column:1/-1;">
+          <label class="lbl">AED Equivalent</label>
+          <div class="fi" style="gap:8px;margin-top:4px;">
+            <input type="number" id="itx-amount-aed" step="0.01" placeholder="Auto-calculated">
+            <span class="sm muted" id="itx-rate-hint"></span>
+          </div>
+          <div class="sm muted mt4">Auto-calculated from stored rate. Override if needed.</div>
+        </div>
+        <div class="field" style="grid-column:1/-1;">
+          <label class="lbl">Note (optional)</label>
+          <input type="text" id="itx-note" placeholder="e.g. Monthly auto-invest">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bp" id="itx-save-btn" onclick="saveInvTx()">Save</button>
+      <button class="btn bg_" onclick="closeModal('inv-tx-modal')">Cancel</button>
+      <button class="btn bdanger bsm" id="itx-delete-btn" style="margin-left:auto;display:none" onclick="deleteInvTx()">Delete</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Import Investment Modal -->
+<div class="overlay" id="inv-import-modal">
+  <div class="modal">
+    <div class="modal-title">Import Investment Transactions</div>
+    <div class="modal-body">
+      <div class="field">
+        <label class="lbl">Investment Account</label>
+        <select id="inv-import-account" style="width:100%;margin-top:4px;"></select>
+      </div>
+      <div class="g2" style="gap:10px;">
+        <div class="field">
+          <label class="lbl">Format</label>
+          <select id="inv-import-format" style="width:100%;margin-top:4px;">
+            <option value="sarwa">Sarwa Excel (Date / Type / Description / Amount)</option>
+            <option value="generic">Generic CSV (date, type, amount)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl">Amount Currency</label>
+          <select id="inv-import-currency" style="width:100%;margin-top:4px;">
+            <option value="USD">USD (Sarwa default)</option>
+            <option value="AED">AED</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+          </select>
+          <div class="sm muted mt4">Currency of the amounts in the file</div>
+        </div>
+      </div>
+      <label for="inv-import-file">
+        <div class="upload-zone" style="padding:14px;margin-top:8px;">
+          <div style="font-size:20px;margin-bottom:4px;">📄</div>
+          <div style="font-size:13px;font-weight:500;">Drop Excel or CSV file here</div>
+          <div class="sm muted mt4">.xlsx or .csv</div>
+        </div>
+      </label>
+      <input type="file" id="inv-import-file" accept=".xlsx,.csv,.xls" onchange="handleInvestmentImport(event)">
+      <div id="inv-import-preview" style="display:none;margin-top:10px;">
+        <div class="sm muted mb8" id="inv-import-count"></div>
+        <div style="overflow-x:auto;max-height:180px;overflow-y:auto;" id="inv-import-table"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bp" id="inv-import-confirm" onclick="confirmInvestmentImport()" style="display:none;">Import</button>
+      <button class="btn bg_" onclick="closeModal('inv-import-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ TRANSACTIONS ══════════════ -->
 <div class="page" id="page-transactions">
   <div class="ph">
@@ -551,6 +788,24 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
   </div>
   <div class="metrics" id="tx-metrics"></div>
   <div class="card sg">
+    <!-- Paging navigator -->
+    <div class="fi mb10" style="gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="pnbtn" onclick="changeTxPage(-1)" id="tx-page-prev">‹</button>
+      <div style="text-align:center;min-width:180px;">
+        <div style="font-size:13.5px;font-weight:500;" id="tx-page-lbl">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;" id="tx-page-range"></div>
+      </div>
+      <button class="pnbtn" onclick="changeTxPage(1)" id="tx-page-next">›</button>
+      <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
+      <select id="tx-page-size" onchange="setTxPageSize(this.value)" style="font-size:12px;padding:4px 7px;">
+        <option value="50">50 / page</option>
+        <option value="100">100 / page</option>
+        <option value="200">200 / page</option>
+        <option value="0">All</option>
+      </select>
+      <span id="tx-page-summary" class="sm muted"></span>
+    </div>
+    <!-- Type + category filters -->
     <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
       <span class="chip active" id="chip-all" onclick="setTypeFilter('',this)">All</span>
       <span class="chip" onclick="setTypeFilter('income',this)">Income</span>
@@ -563,7 +818,7 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
     </div>
     <div style="overflow-x:auto;">
       <table>
-        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Method</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="tx-col-method">Method</th><th style="text-align:right">Amount</th><th></th></tr></thead>
         <tbody id="tx-tbody"></tbody>
       </table>
     </div>
@@ -710,6 +965,85 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
   </div>
 </div>
 
+<!-- ══════════════ CREDIT CARDS ══════════════ -->
+<div class="page" id="page-cards">
+  <div class="ph">
+    <div><div class="pt">Credit Cards</div><div class="ps">Balances, limits, statements and payments</div></div>
+    <button class="btn bp" onclick="openCardModal()">+ Add Card</button>
+  </div>
+  <div id="cards-metrics" class="metrics sg"></div>
+  <div id="cards-list" class="sg"></div>
+  <!-- Payment modal trigger area -->
+  <div class="card sg">
+    <div class="fb mb12">
+      <div class="ct" style="margin:0">Recent Card Transactions</div>
+      <select id="cards-filter-card" onchange="renderCardTx()" style="font-size:12px;padding:4px 8px;">
+        <option value="">All Cards</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th>Card</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+        <tbody id="cards-tx-tbody"></tbody>
+      </table>
+    </div>
+    <div id="cards-tx-empty" class="sm muted" style="padding:10px 0;display:none">No card transactions yet.</div>
+  </div>
+</div>
+
+<!-- Card Modal -->
+<div class="overlay" id="card-modal">
+  <div class="modal">
+    <div class="modal-title" id="card-modal-title">Add Credit Card</div>
+    <div class="modal-body">
+      <div class="g2" style="gap:10px;">
+        <div class="field" style="grid-column:1/-1"><label class="lbl">Card Name</label><input type="text" id="cm-name" placeholder="e.g. Emirates NBD Visa"></div>
+        <div class="field"><label class="lbl">Network</label>
+          <select id="cm-network" style="width:100%"><option>Visa</option><option>Mastercard</option><option>Amex</option></select></div>
+        <div class="field"><label class="lbl">Credit Limit (AED)</label><input type="number" id="cm-limit" value="10000"></div>
+        <div class="field"><label class="lbl">Statement Day of Month</label><input type="number" id="cm-stmt-day" value="25" min="1" max="31" placeholder="e.g. 25"></div>
+        <div class="field"><label class="lbl">Payment Due (days after statement)</label><input type="number" id="cm-pay-days" value="20" min="1" max="60"></div>
+        <div class="field"><label class="lbl">Linked Bank Account</label>
+          <select id="cm-bank" style="width:100%"></select></div>
+        <div class="field"><label class="lbl">Card Colour</label>
+          <input type="color" id="cm-color" value="#2563a8" style="width:60px;height:36px;padding:2px;border-radius:6px;border:1px solid var(--border);cursor:pointer;"></div>
+        <div class="field"><label class="lbl">Current Outstanding (AED)</label><input type="number" id="cm-outstanding" value="0" step="0.01"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bp" id="card-modal-save" onclick="saveCard()">Save Card</button>
+      <button class="btn bg_" onclick="closeModal('card-modal')">Cancel</button>
+      <button class="btn bdanger bsm" id="card-modal-delete" style="margin-left:auto;display:none" onclick="deleteCard()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Card Payment Modal -->
+<div class="overlay" id="card-pay-modal">
+  <div class="modal">
+    <div class="modal-title">Pay Credit Card</div>
+    <div class="modal-body">
+      <div id="card-pay-info" style="background:var(--surface2);border-radius:var(--rs);padding:12px;margin-bottom:14px;font-size:13px;line-height:1.9;"></div>
+      <div class="g2" style="gap:10px;">
+        <div class="field"><label class="lbl">Payment Amount (AED)</label><input type="number" id="cp-amount" step="0.01"></div>
+        <div class="field"><label class="lbl">Payment Date</label><input type="date" id="cp-date"></div>
+        <div class="field"><label class="lbl">Pay From Bank Account</label>
+          <select id="cp-bank" style="width:100%"></select></div>
+        <div class="field"><label class="lbl">Payment Type</label>
+          <select id="cp-type" style="width:100%">
+            <option value="full">Full Statement Balance</option>
+            <option value="minimum">Minimum Payment</option>
+            <option value="custom">Custom Amount</option>
+          </select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn bp" onclick="confirmCardPayment()">Record Payment</button>
+      <button class="btn bg_" onclick="closeModal('card-pay-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ BUDGET vs ACTUAL ══════════════ -->
 <div class="page" id="page-budget">
   <div class="ph"><div><div class="pt">Budget vs Actual</div><div class="ps">Track against targets</div></div><button class="bell-btn" onclick="toggleHub()" title="AI Suggestions"><span>🔔</span></button></div>
@@ -719,6 +1053,34 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
   </div>
   <div class="card sg"><div class="fb mb10"><div class="ct" style="margin:0">Recurring Obligations</div><div class="sm muted" style="font-size:11px;margin-top:2px">From your Obligations — amortised monthly reserve</div></div><div id="bva-quarterly"></div></div>
   <div class="card sg"><div class="fb mb10"><div class="ct" style="margin:0">Annual / Occasional</div><button class="btn bsm bg_" onclick="openBudgetModal('annual')">+ Add</button></div><div id="bva-annual"></div></div>
+</div>
+
+<!-- ══════════════ ANALYTICS ══════════════ -->
+<div class="page" id="page-analytics">
+  <div class="ph">
+    <div><div class="pt">Analytics</div><div class="ps">Spending patterns and category breakdown</div></div>
+    <div class="fi" style="gap:10px;flex-wrap:wrap;">
+      <div class="tabs" style="width:auto;">
+        <div class="tab active" id="an-tab-month" onclick="switchAnalytics(this,'month')">This Month</div>
+        <div class="tab" id="an-tab-3month" onclick="switchAnalytics(this,'3month')">3 Months</div>
+        <div class="tab" id="an-tab-year" onclick="switchAnalytics(this,'year')">This Year</div>
+        <div class="tab" id="an-tab-all" onclick="switchAnalytics(this,'all')">All Time</div>
+      </div>
+      <button class="bell-btn" onclick="toggleHub()" title="Suggestions"><span>🔔</span></button>
+    </div>
+  </div>
+  <div class="card sg">
+    <div class="fb mb10"><div class="ct" style="margin:0">Daily Spend</div><span class="sm muted" id="an-daily-range"></span></div>
+    <div id="an-daily-chart" style="overflow-x:auto;"></div>
+  </div>
+  <div class="g2 sg">
+    <div class="card"><div class="ct">Spend by Category</div><div id="an-bycat"></div></div>
+    <div class="card"><div class="ct">Category Summary</div><div style="overflow-x:auto;"><div id="an-cattable"></div></div></div>
+  </div>
+  <div class="card sg">
+    <div class="fb mb12"><div class="ct" style="margin:0">🔁 Recurring Transactions</div><button class="btn bg_ bsm" onclick="detectRecurring()">Auto-detect</button></div>
+    <div id="an-recurring"></div>
+  </div>
 </div>
 
 <!-- ══════════════ RECEIPT ══════════════ -->
@@ -930,6 +1292,25 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
       </div>
     </div>
 
+
+    <!-- FX Rates -->
+    <div class="card sg">
+      <div class="fb mb8">
+        <div>
+          <div class="ct" style="margin:0">💱 Exchange Rates</div>
+          <div class="sm muted mt4">AED is the base currency. Update rates periodically for accurate net worth calculations.</div>
+        </div>
+        <div class="sm muted" id="fx-updated-at"></div>
+      </div>
+      <div id="fx-rates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px;"></div>
+      <div class="fi" style="gap:9px;flex-wrap:wrap;">
+        <button class="btn bp bsm" onclick="saveFxRates()">Save Rates</button>
+        <button class="btn bg_ bsm" onclick="resetFxRates()">Reset to Defaults</button>
+        <span class="sm muted">Rates sourced manually — check xe.com for current values</span>
+      </div>
+      <div id="fx-save-msg" class="sm mt8" style="display:none;color:var(--accent)"></div>
+    </div>
+
     <!-- Direct bank import -->
     <div class="card sg">
       <div class="ct">📥 Direct Bank Import (CSV / JSON)</div>
@@ -1085,14 +1466,95 @@ let ACCOUNTS={
   cash:[
     {id:'c1',name:'Wallet (AED)',balance:500,currency:'AED'},
   ],
+  cards:[
+    {id:'cc1',name:'Emirates NBD Credit Card',network:'Visa',limit:15000,
+     statementDay:25,paymentDueDays:20,outstandingBalance:0,
+     linkedBankId:'b1',color:'#2563a8'},
+  ],
   banks:[
     {id:'b1',name:'Emirates NBD — Current',number:'****1234',balance:14500,currency:'AED',type:'current'},
     {id:'b2',name:'Emirates NBD — Savings',number:'****5678',balance:28000,currency:'AED',type:'savings'},
-    {id:'b3',name:'Meezan Bank — Lahore',number:'****9012',balance:85000,currency:'PKR',type:'savings',pkr_rate:0.013},
+    {id:'b3',name:'Meezan Bank — Lahore',number:'****9012',balance:85000,currency:'PKR',type:'savings'},
   ],
   investments:[
-    {id:'i1',name:'Serva Portfolio',platform:'Serva',value:15000,monthly_return:1500},
-    {id:'i2',name:'Gold Holdings',platform:'Physical',value:5000,monthly_return:0},
+    {id:'i1',name:'Serva Portfolio',platform:'Serva',value:15000,monthly_return:1500,
+     currency:'AED',transactions:[]},
+    {id:'i2',name:'Gold Holdings',platform:'Physical',value:5000,monthly_return:0,
+     currency:'AED',transactions:[]},
+    {id:'i3',name:'Sarwa',platform:'Sarwa',value:7567.87,monthly_return:0,
+     currency:'USD',transactions:[
+      {date:'2024-09-23',type:'Deposit',amount:543.14},
+      {date:'2024-09-24',type:'Investment',amount:463.21},
+      {date:'2024-10-01',type:'Investment',amount:1702.94},
+      {date:'2024-10-02',type:'Investment',amount:277.89},
+      {date:'2024-10-25',type:'Deposit',amount:1900.99},
+      {date:'2024-10-25',type:'Investment',amount:1619.30},
+      {date:'2024-10-28',type:'Investment',amount:264.80},
+      {date:'2024-11-07',type:'Deposit',amount:2715.69},
+      {date:'2024-11-07',type:'Investment',amount:2304.82},
+      {date:'2024-11-08',type:'Investment',amount:380.62},
+      {date:'2024-11-27',type:'Dividend',amount:36.58},
+      {date:'2024-11-15',type:'Dividend',amount:17.46},
+      {date:'2024-12-02',type:'Deposit',amount:271.57},
+      {date:'2024-12-02',type:'Investment',amount:264.24},
+      {date:'2024-12-03',type:'Investment',amount:57.21},
+      {date:'2024-12-06',type:'Fee',amount:-4.59},
+      {date:'2025-01-08',type:'Fee',amount:-5.36},
+      {date:'2025-01-10',type:'Fee',amount:-1.64},
+      {date:'2025-02-07',type:'Fee',amount:-5.32},
+      {date:'2025-02-18',type:'Dividend',amount:14.57},
+      {date:'2025-03-07',type:'Fee',amount:-4.80},
+      {date:'2025-03-10',type:'Fee',amount:-2.20},
+      {date:'2025-04-07',type:'Fee',amount:-5.14},
+      {date:'2025-04-10',type:'Fee',amount:-1.86},
+      {date:'2025-05-07',type:'Fee',amount:-4.79},
+      {date:'2025-05-12',type:'Fee',amount:-2.21},
+      {date:'2025-05-15',type:'Dividend',amount:13.59},
+      {date:'2025-05-29',type:'Dividend',amount:34.77},
+      {date:'2025-06-06',type:'Fee',amount:-5.35},
+      {date:'2025-06-10',type:'Fee',amount:-1.65},
+      {date:'2025-07-07',type:'Fee',amount:-5.35},
+      {date:'2025-08-07',type:'Fee',amount:-5.66},
+      {date:'2025-08-11',type:'Fee',amount:-1.34},
+      {date:'2025-08-15',type:'Dividend',amount:14.20},
+      {date:'2025-08-26',type:'Sell',amount:7802.84},
+      {date:'2025-08-29',type:'Withdrawal',amount:-7891.46},
+      {date:'2025-09-02',type:'Deposit',amount:543.14},
+      {date:'2025-09-02',type:'Investment',amount:466.56},
+      {date:'2025-09-03',type:'Investment',amount:75.85},
+      {date:'2025-09-05',type:'Fee',amount:-5.13},
+      {date:'2025-09-08',type:'Sell',amount:5.79},
+      {date:'2025-09-10',type:'Fee',amount:-1.87},
+      {date:'2025-09-29',type:'Deposit',amount:1629.42},
+      {date:'2025-09-30',type:'Investment',amount:1383.27},
+      {date:'2025-10-01',type:'Investment',amount:228.00},
+      {date:'2025-10-07',type:'Fee',amount:-0.45},
+      {date:'2025-10-10',type:'Fee',amount:-6.55},
+      {date:'2025-10-30',type:'Deposit',amount:2715.69},
+      {date:'2025-10-30',type:'Investment',amount:2307.27},
+      {date:'2025-10-31',type:'Investment',amount:383.60},
+      {date:'2025-11-07',type:'Fee',amount:-1.74},
+      {date:'2025-11-10',type:'Fee',amount:-5.26},
+      {date:'2025-11-17',type:'Dividend',amount:10.07},
+      {date:'2025-11-26',type:'Dividend',amount:21.97},
+      {date:'2025-12-03',type:'Deposit',amount:950.49},
+      {date:'2025-12-04',type:'Investment',amount:815.96},
+      {date:'2025-12-05',type:'Investment',amount:141.47},
+      {date:'2025-12-05',type:'Fee',amount:-3.41},
+      {date:'2025-12-10',type:'Fee',amount:-3.59},
+      {date:'2026-01-07',type:'Deposit',amount:543.14},
+      {date:'2026-01-07',type:'Investment',amount:437.99},
+      {date:'2026-01-08',type:'Investment',amount:91.43},
+      {date:'2026-01-08',type:'Fee',amount:-4.25},
+      {date:'2026-02-06',type:'Deposit',amount:1086.28},
+      {date:'2026-02-06',type:'Fee',amount:-4.74},
+      {date:'2026-02-09',type:'Investment',amount:896.14},
+      {date:'2026-02-09',type:'Dividend',amount:13.30},
+      {date:'2026-02-10',type:'Investment',amount:181.36},
+      {date:'2026-02-10',type:'Fee',amount:-2.26},
+      {date:'2026-03-06',type:'Fee',amount:-5.01},
+      {date:'2026-03-10',type:'Fee',amount:-1.99},
+    ]},
   ],
   properties:[
     {id:'p1',name:'House — Lahore',location:'Lahore, Pakistan',est_value_pkr:12000000,est_value_aed:156000,used_by:'Mother',status:'Family residence'},
@@ -1101,6 +1563,18 @@ let ACCOUNTS={
 };
 
 let INCOME={salary:17000,serva:1500,other:0};
+
+// FX rates — AED is base currency (1 AED = X foreign)
+// Store as how many AED 1 unit of foreign currency buys
+let FX_RATES={
+  USD: 3.672,   // 1 USD = 3.672 AED
+  EUR: 4.010,   // 1 EUR = 4.010 AED
+  GBP: 4.680,   // 1 GBP = 4.680 AED
+  PKR: 0.0132,  // 1 PKR = 0.0132 AED
+  INR: 0.0441,  // 1 INR = 0.0441 AED
+  SAR: 0.979,   // 1 SAR = 0.979 AED
+  updatedAt: '2026-03-24'
+};
 
 let TRANSACTIONS=[
   {id:1,date:'2025-03-20',desc:'Carrefour Mirdif',cat:'grocery',amount:243.50,type:'expense',source:'credit_card'},
@@ -1137,13 +1611,17 @@ let insightsHistory=[];
 // State
 let curPeriod={m:2,y:2025};
 let txTypeFilter='';
+let txPage=0;
+let txPageSize=50;
+let txPeriodFilter=''; // kept for backward compat — not used for filtering
 let isPeriod='monthly',isCurPeriod={m:2,y:2025};
 let cfMode='monthly',cfCurPeriod={m:2,y:2025};
 let projHorizon=6;
 let receiptB64=null,parsedReceipt=null,parsedStmtTx=[];
 let editingTxId=null;
 let todaySelectedCat='grocery';
-let todayDate=new Date().toISOString().split('T')[0];
+function getTodayStr(){ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+let todayDate=getTodayStr();
 let todayCatFilter='all';
 let entityModalCtx=null,budgetModalCtx=null,oblModalCtx=null;
 let dismissedNudges=new Set();
@@ -1189,10 +1667,82 @@ function calcFloor(){
   const aE=BUDGETS.annual.filter(b=>b.essential).reduce((s,b)=>s+b.annual/12,0);
   return{items:[...BUDGETS.fixed,...BUDGETS.variable].filter(b=>b.essential),qAmo:Math.round(qE),aAmo:Math.round(aE),total:Math.round(ess+qE+aE)};
 }
+// ── Investment Transactions (flat store, separate from spending TRANSACTIONS) ──
+// Fields: id, investmentId, date, type, amountNative, currency, amountAED, note
+let INVESTMENT_TRANSACTIONS = [];
+
+// Migrate nested inv.transactions to flat store on first load
+function migrateInvestmentTx(){
+  (ACCOUNTS.investments||[]).forEach(inv=>{
+    const existing=(inv.transactions||[]);
+    if(!existing.length) return;
+    existing.forEach(t=>{
+      // Check not already migrated for THIS investment
+      const alreadyMigrated=INVESTMENT_TRANSACTIONS.find(x=>
+        x.investmentId===inv.id &&
+        x.date===t.date &&
+        x.type===t.type &&
+        Math.abs((x.amountNative||0)-t.amount)<0.01
+      );
+      if(alreadyMigrated) return;
+      const cur=t.currency||inv.currency||'AED';
+      INVESTMENT_TRANSACTIONS.push({
+        id:'itx'+Date.now()+Math.random().toString(36).slice(2,6),
+        investmentId:inv.id,
+        date:t.date,
+        type:t.type,
+        amountNative:t.amount,
+        currency:cur,
+        amountAED:toAED(t.amount,cur),
+        note:t.note||''
+      });
+    });
+    // Clear nested after migration
+    inv.transactions=[];
+  });
+}
+
+// Repair: detect transactions assigned to wrong investment account
+// Sarwa transactions should be on i3, not i1/i2
+function repairInvestmentTx(){
+  const sarwa=(ACCOUNTS.investments||[]).find(i=>i.name==='Sarwa');
+  const serva=(ACCOUNTS.investments||[]).find(i=>i.name==='Serva Portfolio');
+  if(!sarwa||!serva) return;
+
+  // If serva has many transactions but serva.transactions[] is empty,
+  // those are likely Sarwa's migrated incorrectly
+  const servaFlatCount=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===serva.id).length;
+  const sarwaFlatCount=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===sarwa.id).length;
+
+  // Heuristic: Sarwa trades in USD; Serva is AED
+  // If serva has USD transactions, they're almost certainly Sarwa's
+  const servaUsdTx=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===serva.id&&t.currency==='USD');
+  if(servaUsdTx.length>0){
+    console.log('Repairing '+servaUsdTx.length+' USD transactions misassigned to Serva → moving to Sarwa');
+    servaUsdTx.forEach(t=>{ t.investmentId=sarwa.id; });
+  }
+}
+
+// ─── Currency helpers ────────────────────────────────────────
+function toAED(amount, currency){
+  if(!currency||currency==='AED') return amount;
+  const rate=FX_RATES[currency];
+  if(!rate){ return amount; }
+  return amount*rate;
+}
+function fmtFx(amount, currency){
+  if(!currency||currency==='AED') return fmt(amount);
+  return currency+' '+fmtN(amount)+' ('+fmt(toAED(amount,currency))+')';
+}
+function fxRate(currency){
+  if(!currency||currency==='AED') return 1;
+  return FX_RATES[currency]||1;
+}
+
 function calcNW(){
   let liq=0;
   (ACCOUNTS.cash||[]).forEach(c=>{liq+=c.balance||0;});
-  ACCOUNTS.banks.forEach(b=>{liq+=b.currency==='PKR'?b.balance*(b.pkr_rate||0.013):b.balance;});
+  ACCOUNTS.banks.forEach(b=>{liq+=toAED(b.balance,b.currency);});
   ACCOUNTS.investments.forEach(i=>{liq+=i.value;});
   const prop=ACCOUNTS.properties.reduce((s,p)=>s+p.est_value_aed,0);
   const liab=ACCOUNTS.liabilities.reduce((s,l)=>s+l.amount,0);
@@ -1389,7 +1939,7 @@ function buildAllSuggestions() {
   const inc   = incForPeriod(m,y)||(INCOME.salary+INCOME.serva);
   const exp   = expForPeriod(m,y);
   const floor = calcFloor();
-  const liq   = (ACCOUNTS.cash||[]).reduce((s,c)=>s+(c.balance||0),0)+ACCOUNTS.banks.reduce((s,b)=>s+(b.currency==='PKR'?b.balance*(b.pkr_rate||0.013):b.balance),0);
+  const liq   = (ACCOUNTS.cash||[]).reduce((s,c)=>s+(c.balance||0),0)+ACCOUNTS.banks.reduce((s,b)=>s+(toAED(b.balance,b.currency)),0);
 
   OBLIGATIONS.forEach(obl=>{
     const days=oblDaysRemaining(obl);
@@ -1492,7 +2042,7 @@ function nav(id,el){
   else document.querySelectorAll('.ni').forEach(n=>{if(n.getAttribute('onclick')?.includes("'"+id+"'"))n.classList.add('active');});
   closeSidebar();
   const r={
-    today:renderToday,dashboard:renderDashboard,obligations:renderObligations,networth:renderNetWorth,
+    today:renderToday,investments:renderInvestments,analytics:renderAnalytics,dashboard:renderDashboard,obligations:renderObligations,networth:renderNetWorth,
     transactions:renderTransactions,'income-stmt':()=>renderIS(isPeriod),
     cashflow:()=>renderCF(cfMode),budget:renderBVA,zakat:calcZakat,
     risk:renderRisk,insights:renderInsightSidebar,admin:()=>renderAdmin('accounts'),
@@ -1515,13 +2065,18 @@ function periodLabel(mode,m,y){return mode==='monthly'?MN[m]+' '+y:mode==='quart
 // TODAY PAGE
 // ═══════════════════════════════════════════════════════════
 function changeTodayDate(d){
-  const dt=new Date(todayDate+'T00:00:00');
-  dt.setDate(dt.getDate()+d);
-  todayDate=dt.toISOString().split('T')[0];
+  // Parse date parts directly to avoid timezone shift
+  const [y,m,day]=todayDate.split('-').map(Number);
+  const dt=new Date(y,m-1,day+d); // local time, no UTC conversion
+  const ny=dt.getFullYear();
+  const nm=String(dt.getMonth()+1).padStart(2,'0');
+  const nd=String(dt.getDate()).padStart(2,'0');
+  todayDate=ny+'-'+nm+'-'+nd;
   renderToday();
 }
 function resetTodayDate(){
-  todayDate=new Date().toISOString().split('T')[0];
+  const now=new Date();
+  todayDate=getTodayStr();
   renderToday();
 }
 function setTodayCatFilter(f, el){
@@ -1552,7 +2107,7 @@ function renderTodayCatGrid(){
 function renderToday(){
   const now=new Date();
   const selectedDate=new Date(todayDate+'T00:00:00');
-  const isToday=todayDate===now.toISOString().split('T')[0];
+  const isToday=todayDate===getTodayStr();
   const hour=now.getHours();
   const fixedGreeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
   const dateStr=selectedDate.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -1584,7 +2139,7 @@ function renderToday(){
     <div class="metric"><div class="ml">Month Remaining</div><div class="mv amber">${fmt(Math.max(0,inc-exp))}</div><div class="ms">${daysLeft} days left</div></div>
     <div class="metric"><div class="ml">On Track</div><div class="mv" style="color:${exp/daysInMonth*daysLeft+exp<=inc?'var(--accent)':'var(--red)'}">${exp/daysInMonth*daysLeft+exp<=inc?'Yes ✓':'Over ⚠'}</div><div class="ms">Projected month-end</div></div>
   `;
-  document.getElementById('today-days-left').textContent=daysLeft+' days remaining in '+MN[m];
+
 
   // Today's transaction list
   const txEl=document.getElementById('today-txlist');
@@ -1636,23 +2191,7 @@ function renderToday(){
     oppEl.innerHTML='<div class="sm muted" style="padding:10px 0">✓ All variable categories are on pace this month. Good discipline!</div>';
   }
 
-  // Variable budget pulse
-  const pulseEl=document.getElementById('today-budget-pulse');
-  pulseEl.innerHTML=BUDGETS.variable.map(b=>{
-    const s=spend[b.id]||0;
-    const pct=Math.min(Math.round(s/(b.budget||1)*100),100);
-    const over=s>b.budget;
-    const c=getCat(b.id);
-    const dailyRate=s/Math.max(1,now.getDate());
-    const projectedMonth=Math.round(dailyRate*daysInMonth);
-    return `<div style="padding:7px 0;border-bottom:1px solid var(--border)">
-      <div class="fb" style="margin-bottom:4px">
-        <div style="font-size:13px;display:flex;align-items:center;gap:5px">${c.icon} ${b.name||c.name}</div>
-        <div style="font-size:11px;color:var(--muted)">${fmtN(s)} / ${fmtN(b.budget)}${projectedMonth>b.budget?` · projected ${fmtN(projectedMonth)}`:''}</div>
-      </div>
-      <div class="ptrak"><div class="pfill" style="width:${pct}%;background:${over?'var(--red)':pct>80?'var(--amber)':'var(--accent)'}"></div></div>
-    </div>`;
-  }).join('');
+
 }
 
 function selectTodayCat(catId, btn){
@@ -1688,6 +2227,276 @@ function addTodayExpense(){
   renderToday();
   toast(fmt(amt)+' added ✓');
 }
+
+
+// ═══════════════════════════════════════════════════════════
+// CREDIT CARDS ENGINE
+// ═══════════════════════════════════════════════════════════
+let cardModalCtx=null;
+let cardPayCtx=null;
+
+function cardOutstanding(card){
+  // Sum all credit_card source transactions for this card since last statement date
+  const today=new Date(); today.setHours(0,0,0,0);
+  const stmtDay=card.statementDay||25;
+  // Last statement date
+  let lastStmt=new Date(today.getFullYear(),today.getMonth(),stmtDay);
+  if(lastStmt>today) lastStmt=new Date(today.getFullYear(),today.getMonth()-1,stmtDay);
+  const stmtStr=lastStmt.getFullYear()+'-'+String(lastStmt.getMonth()+1).padStart(2,'0')+'-'+String(lastStmt.getDate()).padStart(2,'0');
+
+  const txs=TRANSACTIONS.filter(t=>
+    t.source==='credit_card'&&
+    (t.cardId===card.id||(card.isDefault&&!t.cardId))&&
+    t.type==='expense'&&
+    t.date>stmtStr
+  );
+  return txs.reduce((s,t)=>s+t.amount,0);
+}
+
+function cardNextStatementDate(card){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const day=card.statementDay||25;
+  let next=new Date(today.getFullYear(),today.getMonth(),day);
+  if(next<=today) next=new Date(today.getFullYear(),today.getMonth()+1,day);
+  return next;
+}
+
+function cardNextPaymentDate(card){
+  const stmt=cardNextStatementDate(card);
+  const due=new Date(stmt);
+  due.setDate(due.getDate()+(card.paymentDueDays||20));
+  return due;
+}
+
+function cardUtilisation(card){
+  const bal=card.outstandingBalance||cardOutstanding(card);
+  return card.limit?Math.round(bal/card.limit*100):0;
+}
+
+function renderCards(){
+  if(!ACCOUNTS.cards) ACCOUNTS.cards=[];
+
+  // Metrics
+  const totalLimit=ACCOUNTS.cards.reduce((s,c)=>s+c.limit,0);
+  const totalBal=ACCOUNTS.cards.reduce((s,c)=>s+(c.outstandingBalance||0),0);
+  const totalAvail=totalLimit-totalBal;
+  const dueCount=ACCOUNTS.cards.filter(c=>{
+    const days=Math.round((cardNextPaymentDate(c)-new Date())/(1000*60*60*24));
+    return days<=7;
+  }).length;
+
+  document.getElementById('cards-metrics').innerHTML=`
+    <div class="metric"><div class="ml">Total Limit</div><div class="mv">${fmt(totalLimit)}</div><div class="ms">${ACCOUNTS.cards.length} card${ACCOUNTS.cards.length!==1?'s':''}</div></div>
+    <div class="metric"><div class="ml">Outstanding</div><div class="mv red">${fmt(totalBal)}</div><div class="ms">Across all cards</div></div>
+    <div class="metric"><div class="ml">Available Credit</div><div class="mv green">${fmt(totalAvail)}</div><div class="ms">${totalLimit?Math.round(totalAvail/totalLimit*100):0}% free</div></div>
+    <div class="metric"><div class="ml">Payments Due</div><div class="mv" style="color:${dueCount?'var(--red)':'var(--accent)'}">${dueCount||'None'}</div><div class="ms">Within 7 days</div></div>`;
+
+  // Card cards
+  const list=document.getElementById('cards-list');
+  if(!list) return;
+  if(!ACCOUNTS.cards.length){
+    list.innerHTML='<div class="card" style="text-align:center;padding:32px;color:var(--muted)"><div style="font-size:28px;margin-bottom:8px">💳</div><div style="font-weight:500;margin-bottom:4px">No credit cards added</div><div style="font-size:13px">Add a card to track balances, statements and payments.</div></div>';
+    return;
+  }
+
+  list.innerHTML=ACCOUNTS.cards.map(card=>{
+    const bal=card.outstandingBalance||0;
+    const util=card.limit?Math.round(bal/card.limit*100):0;
+    const avail=card.limit-bal;
+    const stmtDate=cardNextStatementDate(card);
+    const payDate=cardNextPaymentDate(card);
+    const daysToStmt=Math.round((stmtDate-new Date())/(1000*60*60*24));
+    const daysToPay=Math.round((payDate-new Date())/(1000*60*60*24));
+    const utilCol=util>80?'var(--red)':util>50?'var(--amber)':'var(--accent)';
+    const linkedBank=ACCOUNTS.banks.find(b=>b.id===card.linkedBankId);
+    const network={Visa:'VISA',Mastercard:'MC',Amex:'AMEX'}[card.network]||card.network;
+
+    return `<div class="card sg">
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+        <!-- Card visual -->
+        <div style="min-width:200px;max-width:260px;flex:1;background:${card.color||'#2563a8'};border-radius:12px;padding:18px 20px;color:white;font-family:'DM Sans',sans-serif;position:relative;overflow:hidden;">
+          <div style="font-size:11px;letter-spacing:1.5px;opacity:.7;margin-bottom:12px;">${network}</div>
+          <div style="font-size:22px;font-weight:600;margin-bottom:4px;">${fmt(bal)}</div>
+          <div style="font-size:11px;opacity:.7;">Outstanding of ${fmt(card.limit)} limit</div>
+          <div style="position:absolute;bottom:16px;right:18px;font-size:13px;font-weight:500;opacity:.85;">${card.name.split(' ').pop()}</div>
+          <div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.08);"></div>
+        </div>
+        <!-- Card details -->
+        <div style="flex:2;min-width:220px;">
+          <div style="font-size:16px;font-weight:600;margin-bottom:12px;">${card.name}</div>
+          <!-- Utilisation bar -->
+          <div class="fb mb4"><span class="sm muted">Credit used</span><span class="sm" style="color:${utilCol}">${util}%</span></div>
+          <div class="ptrak mb12"><div class="pfill" style="width:${Math.min(util,100)}%;background:${utilCol}"></div></div>
+          <div class="g2" style="gap:8px;font-size:13px;margin-bottom:12px;">
+            <div style="background:var(--surface2);border-radius:var(--rs);padding:10px;">
+              <div class="muted sm">Available</div>
+              <div style="font-weight:600;color:var(--accent)">${fmt(avail)}</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:var(--rs);padding:10px;">
+              <div class="muted sm">Statement</div>
+              <div style="font-weight:500">${stmtDate.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} <span class="muted">(${daysToStmt}d)</span></div>
+            </div>
+            <div style="background:${daysToPay<=7?'var(--redl)':'var(--surface2)'};border-radius:var(--rs);padding:10px;">
+              <div class="muted sm">Payment due</div>
+              <div style="font-weight:500;color:${daysToPay<=7?'var(--red)':'var(--text)'}">${payDate.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} <span class="muted">(${daysToPay}d)</span></div>
+            </div>
+            <div style="background:var(--surface2);border-radius:var(--rs);padding:10px;">
+              <div class="muted sm">Linked bank</div>
+              <div style="font-weight:500;font-size:12px">${linkedBank?linkedBank.name:'—'}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn bp bsm" onclick="openCardPayModal('${card.id}')">💳 Pay Card</button>
+            <button class="btn bo bsm" onclick="openCardModal('${card.id}')">Edit</button>
+            <button class="btn bg_ bsm" onclick="setDefaultCard('${card.id}')">${card.isDefault?'✓ Default':'Set as Default'}</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderCardTx();
+}
+
+function renderCardTx(){
+  const sel=document.getElementById('cards-filter-card');
+  if(sel&&!sel.options.length){
+    ACCOUNTS.cards.forEach(c=>{
+      const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o);
+    });
+  }
+  const filterCard=sel?.value||'';
+  const txs=TRANSACTIONS.filter(t=>t.source==='credit_card'&&t.type==='expense'&&(!filterCard||(t.cardId===filterCard||(ACCOUNTS.cards.find(c=>c.id===filterCard)?.isDefault&&!t.cardId)))).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+  const tbody=document.getElementById('cards-tx-tbody');
+  const empty=document.getElementById('cards-tx-empty');
+  if(!txs.length){if(tbody)tbody.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  const card=filterCard?ACCOUNTS.cards.find(c=>c.id===filterCard):null;
+  if(tbody) tbody.innerHTML=txs.map(t=>{
+    const c=getCat(t.cat);
+    const cc=ACCOUNTS.cards.find(x=>x.id===t.cardId)||ACCOUNTS.cards.find(x=>x.isDefault)||null;
+    return `<tr>
+      <td class="muted sm">${t.date}</td>
+      <td style="font-weight:500">${t.desc}</td>
+      <td><span style="font-size:12px;padding:2px 7px;border-radius:4px;background:${cc?.color||'#2563a8'};color:white">${cc?.name.split(' ').pop()||'Card'}</span></td>
+      <td><span class="badge" style="background:${c.bg};color:${c.color};font-size:11px">${c.icon} ${c.name}</span></td>
+      <td style="text-align:right;font-weight:600;color:var(--red)">${fmt(t.amount)}</td>
+      <td><button onclick="editTx(${t.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px">✎</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function openCardModal(id){
+  cardModalCtx={id:id||'new'};
+  const isNew=!id, card=id?ACCOUNTS.cards.find(c=>c.id===id):null;
+  document.getElementById('card-modal-title').textContent=isNew?'Add Credit Card':'Edit Card';
+  document.getElementById('card-modal-delete').style.display=isNew?'none':'block';
+  if(card){
+    document.getElementById('cm-name').value=card.name||'';
+    document.getElementById('cm-network').value=card.network||'Visa';
+    document.getElementById('cm-limit').value=card.limit||0;
+    document.getElementById('cm-stmt-day').value=card.statementDay||25;
+    document.getElementById('cm-pay-days').value=card.paymentDueDays||20;
+    document.getElementById('cm-color').value=card.color||'#2563a8';
+    document.getElementById('cm-outstanding').value=card.outstandingBalance||0;
+  } else {
+    document.getElementById('cm-name').value='';
+    document.getElementById('cm-limit').value=10000;
+    document.getElementById('cm-stmt-day').value=25;
+    document.getElementById('cm-pay-days').value=20;
+    document.getElementById('cm-outstanding').value=0;
+  }
+  // Populate bank dropdown
+  const sel=document.getElementById('cm-bank');
+  sel.innerHTML=ACCOUNTS.banks.map(b=>`<option value="${b.id}" ${card?.linkedBankId===b.id?'selected':''}>${b.name}</option>`).join('');
+  document.getElementById('card-modal').classList.add('show');
+}
+
+function saveCard(){
+  const g=n=>document.getElementById(n)?.value||'';
+  const gn=n=>parseFloat(document.getElementById(n)?.value)||0;
+  const{id}=cardModalCtx, isNew=id==='new';
+  const obj={
+    id:isNew?'cc'+Date.now():id,
+    name:g('cm-name'),network:g('cm-network'),
+    limit:gn('cm-limit'),statementDay:parseInt(g('cm-stmt-day'))||25,
+    paymentDueDays:parseInt(g('cm-pay-days'))||20,
+    linkedBankId:g('cm-bank'),color:g('cm-color'),
+    outstandingBalance:gn('cm-outstanding'),
+    isDefault:isNew&&!ACCOUNTS.cards.length // first card is default
+  };
+  if(!ACCOUNTS.cards) ACCOUNTS.cards=[];
+  if(isNew) ACCOUNTS.cards.push(obj);
+  else Object.assign(ACCOUNTS.cards.find(c=>c.id===id)||{},obj);
+  closeModal('card-modal');
+  scheduleSave();
+  renderCards();
+  toast('Card saved ✓');
+}
+
+function deleteCard(){
+  const{id}=cardModalCtx;
+  ACCOUNTS.cards=ACCOUNTS.cards.filter(c=>c.id!==id);
+  closeModal('card-modal');scheduleSave();renderCards();toast('Card removed');
+}
+
+function setDefaultCard(id){
+  ACCOUNTS.cards.forEach(c=>c.isDefault=c.id===id);
+  scheduleSave();renderCards();toast('Default card updated ✓');
+}
+
+function openCardPayModal(cardId){
+  cardPayCtx={cardId};
+  const card=ACCOUNTS.cards.find(c=>c.id===cardId);
+  if(!card) return;
+  const bal=card.outstandingBalance||0;
+  const payDate=cardNextPaymentDate(card);
+  document.getElementById('card-pay-info').innerHTML=
+    '<strong>'+card.name+'</strong><br>'
+    +'Outstanding: <strong style="color:var(--red)">'+fmt(bal)+'</strong><br>'
+    +'Payment due: <strong>'+payDate.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+'</strong>';
+  document.getElementById('cp-amount').value=bal.toFixed(2);
+  document.getElementById('cp-date').value=getTodayStr();
+  document.getElementById('cp-type').value='full';
+  const bankSel=document.getElementById('cp-bank');
+  bankSel.innerHTML=ACCOUNTS.banks.map(b=>`<option value="${b.id}" ${card.linkedBankId===b.id?'selected':''}>${b.name}</option>`).join('');
+  document.getElementById('card-pay-modal').classList.add('show');
+}
+
+function confirmCardPayment(){
+  const amt=parseFloat(document.getElementById('cp-amount').value)||0;
+  const date=document.getElementById('cp-date').value;
+  const bankId=document.getElementById('cp-bank').value;
+  if(!amt||!date) return toast('Enter amount and date',true);
+  const{cardId}=cardPayCtx;
+  const card=ACCOUNTS.cards.find(c=>c.id===cardId);
+  const bank=ACCOUNTS.banks.find(b=>b.id===bankId);
+  if(!card) return;
+
+  // Record as a transfer transaction (bank → card)
+  TRANSACTIONS.push({
+    id:Date.now(),date,
+    desc:card.name+' — Card Payment',
+    cat:'other',amount:amt,
+    type:'transfer',
+    source:'bank',
+    cardPayment:true,
+    fromBankId:bankId,
+    toCardId:cardId
+  });
+
+  // Update card outstanding balance
+  card.outstandingBalance=Math.max(0,(card.outstandingBalance||0)-amt);
+
+  // Deduct from bank balance
+  if(bank) bank.balance=Math.max(0,(bank.balance||0)-amt);
+
+  closeModal('card-pay-modal');
+  scheduleSave();
+  renderCards();
+  toast('Payment of '+fmt(amt)+' recorded ✓');
+}
+
 
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD
@@ -1729,11 +2538,21 @@ function renderDashboard(){
     </div>`;
   }).join('');
 
-  const allB=[...BUDGETS.fixed,...BUDGETS.variable,...BUDGETS.quarterly.map(b=>({...b,budget:Math.round(b.quarterly/3)}))];
-  document.getElementById('dash-budget').innerHTML=allB.map(b=>{
-    const s=spend[b.id]||0,pct=Math.min(Math.round(s/(b.budget||1)*100),100),over=s>b.budget,c=getCat(b.id);
-    return `<div style="padding:7px 0;border-bottom:1px solid var(--border)"><div class="fb" style="margin-bottom:4px"><div style="font-size:13px;display:flex;align-items:center;gap:5px">${c.icon} ${b.name||c.name}</div><div style="font-size:11px;color:var(--muted)">${fmtN(s)}/${fmtN(b.budget)}${over?' <span style="color:var(--red)">▲</span>':''}</div></div><div class="ptrak"><div class="pfill" style="width:${pct}%;background:${over?'var(--red)':pct>80?'var(--amber)':'var(--accent)'}"></div></div></div>`;
-  }).join('');
+  // Dashboard shows top 5 most-used/over-budget categories only
+  const allB=[...BUDGETS.fixed,...BUDGETS.variable];
+  const overB=allB.filter(b=>(spend[b.id]||0)>b.budget);
+  const nearB=allB.filter(b=>{const pct=(spend[b.id]||0)/(b.budget||1);return pct>0.7&&pct<=1;});
+  const showB=[...overB,...nearB].slice(0,5);
+  const totalOver=overB.length;
+  const totalNear=nearB.filter(b=>!overB.includes(b)).length;
+  document.getElementById('dash-budget').innerHTML=showB.length
+    ? showB.map(b=>{
+        const s=spend[b.id]||0,pct=Math.min(Math.round(s/(b.budget||1)*100),100),over=s>b.budget,c=getCat(b.id);
+        return `<div style="padding:6px 0;border-bottom:1px solid var(--border)"><div class="fb" style="margin-bottom:3px"><div style="font-size:13px;display:flex;align-items:center;gap:5px">${c.icon} ${b.name||c.name}</div><div style="font-size:11px;color:var(--muted)">${fmtN(s)}/${fmtN(b.budget)}${over?' <span style="color:var(--red)">▲</span>':''}</div></div><div class="ptrak"><div class="pfill" style="width:${pct}%;background:${over?'var(--red)':pct>80?'var(--amber)':'var(--accent)'}"></div></div></div>`;
+      }).join('')
+    : '<div class="sm muted" style="padding:6px 0">✓ All categories on track</div>';
+  const sumEl=document.getElementById('dash-budget-summary');
+  if(sumEl) sumEl.textContent=totalOver>0?totalOver+' category'+(totalOver>1?'ies':' ')+(totalOver>1?'ies are ':' is ')+'over budget'+(totalNear>0?', '+totalNear+' approaching limit':''):totalNear>0?totalNear+' category'+(totalNear>1?'ies':' ')+'approaching limit':'All budgets healthy ✓';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1745,7 +2564,7 @@ function renderObligations(){
   const urgentCount=activeObls.filter(o=>oblUrgency(oblDaysRemaining(o))==='urgent').length;
   const totalAnnual=activeObls.reduce((s,o)=>s+o.amount*(12/oblIntervalMonths(o)),0);
   const archivedCount=OBLIGATIONS.filter(o=>!oblIsActive(o)).length;
-  const liq=(ACCOUNTS.cash||[]).reduce((s,c)=>s+(c.balance||0),0)+ACCOUNTS.banks.reduce((s,b)=>s+(b.currency==='PKR'?b.balance*(b.pkr_rate||0.013):b.balance),0);
+  const liq=(ACCOUNTS.cash||[]).reduce((s,c)=>s+(c.balance||0),0)+ACCOUNTS.banks.reduce((s,b)=>s+(toAED(b.balance,b.currency)),0);
 
   document.getElementById('obl-metrics').innerHTML=`
     <div class="metric"><div class="ml">Monthly Reserve Needed</div><div class="mv amber">${fmt(totalMonthlyReserve)}</div><div class="ms">Across all obligations</div></div>
@@ -1834,7 +2653,7 @@ function renderObligationCards(){
 
 function markPaid(id){
   const obl=OBLIGATIONS.find(o=>o.id===id);if(!obl)return;
-  const today=new Date().toISOString().split('T')[0];
+  const today=getTodayStr();
   obl.lastPaid=today;
   // Decrement count if set
   if(obl.remainingCount!=null&&obl.remainingCount>0){
@@ -1973,7 +2792,7 @@ function renderNetWorth(){
     aR+='<div class="divider"></div>';
   }
   aR+='<div class="ct mb8" style="margin-top:4px">Banks</div>';
-  ACCOUNTS.banks.forEach(b=>{const aed=b.currency==='PKR'?Math.round(b.balance*(b.pkr_rate||0.013)):b.balance;aR+=`<div class="row"><div><div style="font-size:14px;font-weight:500">${b.name}</div><div class="sm muted">${b.number}${b.currency==='PKR'?` · ${fmtN(b.balance)} PKR`:''}</div></div><div style="font-weight:600;color:var(--accent)">${fmt(aed)}</div></div>`;});
+  ACCOUNTS.banks.forEach(b=>{const aed=Math.round(toAED(b.balance,b.currency));aR+=`<div class="row"><div><div style="font-size:14px;font-weight:500">${b.name}</div><div class="sm muted">${b.number}${b.currency==='PKR'?` · ${fmtN(b.balance)} PKR`:''}</div></div><div style="font-weight:600;color:var(--accent)">${fmt(aed)}</div></div>`;});
   aR+='<div class="divider"></div><div class="ct mb8">Investments</div>';
   ACCOUNTS.investments.forEach(i=>{aR+=`<div class="row"><div><div style="font-size:14px;font-weight:500">${i.name}</div><div class="sm muted">${i.platform}${i.monthly_return?` · +${fmt(i.monthly_return)}/mo`:''}</div></div><div style="font-weight:600;color:var(--accent)">${fmt(i.value)}</div></div>`;});
   aR+='<div class="divider"></div><div class="ct mb8">Property</div>';
@@ -1982,7 +2801,7 @@ function renderNetWorth(){
   let lR=ACCOUNTS.liabilities.length?ACCOUNTS.liabilities.map(l=>`<div class="row"><div style="font-weight:500">${l.name}</div><div class="red f600">−${fmt(l.amount)}</div></div>`).join(''):'<div class="sm muted" style="padding:10px 0">No liabilities ✓</div>';
   lR+=`<div class="divider"></div><div class="ct mb4">Net Worth</div><div style="font-size:24px;font-weight:600;color:var(--accent)">${fmt(nw.net)}</div><div class="sm muted mt4">Liquid ${fmt(nw.liquid)} · Property ${fmt(nw.properties)}</div>`;
   document.getElementById('nw-liab').innerHTML=lR;
-  const bA=(ACCOUNTS.cash||[]).reduce((s,c)=>s+(c.balance||0),0)+ACCOUNTS.banks.reduce((s,b)=>s+(b.currency==='PKR'?b.balance*(b.pkr_rate||0.013):b.balance),0);
+  const bA=(ACCOUNTS.cash||[]).reduce((s,c)=>s+(c.balance||0),0)+ACCOUNTS.banks.reduce((s,b)=>s+(toAED(b.balance,b.currency)),0);
   const iA=ACCOUNTS.investments.reduce((s,i)=>s+i.value,0),tot=nw.assets,bp=Math.round(bA/tot*100),ip=Math.round(iA/tot*100),pp=100-bp-ip;
   document.getElementById('nw-bar').innerHTML=`<div style="display:flex;height:18px;border-radius:5px;overflow:hidden;margin-bottom:10px"><div style="width:${bp}%;background:var(--accent)"></div><div style="width:${ip}%;background:var(--amber)"></div><div style="width:${pp}%;background:var(--blue)"></div></div><div style="display:flex;gap:14px;font-size:12px;color:var(--muted)"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--accent);margin-right:4px"></span>Banks ${bp}%</span><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--amber);margin-right:4px"></span>Investments ${ip}%</span><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--blue);margin-right:4px"></span>Property ${pp}%</span></div><div class="tip mt12">Your Lahore house (${pp}% of net worth) earns no current return but is an appreciating asset providing family security. Update the AED estimate when PKR/AED rate changes significantly.</div>`;
 }
@@ -2017,6 +2836,86 @@ function populateCatDropdowns(){
   }
 }
 
+function changeTxPage(d){
+  txPage=Math.max(0,txPage+d);
+  renderTx();
+  updateTxPageUI();
+}
+
+function setTxPageSize(val){
+  txPageSize=parseInt(val)||0;
+  txPage=0;
+  renderTx();
+  updateTxPageUI();
+}
+
+function updateTxPageUI(){
+  // Get filtered rows (before paging) to know totals
+  const cat=document.getElementById('f-cat')?.value||'';
+  const src=document.getElementById('f-src')?.value||'';
+  const srch=document.getElementById('f-search')?.value.toLowerCase()||'';
+  let all=[...TRANSACTIONS].sort((a,b)=>b.date.localeCompare(a.date));
+  if(txTypeFilter) all=all.filter(t=>t.type===txTypeFilter);
+  if(cat) all=all.filter(t=>t.cat===cat);
+  if(src) all=all.filter(t=>t.source===src);
+  if(srch) all=all.filter(t=>t.desc.toLowerCase().includes(srch)||t.cat.includes(srch));
+
+  const total=all.length;
+  const pageSize=txPageSize||total;
+  const totalPages=pageSize?Math.ceil(total/pageSize):1;
+  // Clamp page
+  if(txPage>=totalPages) txPage=Math.max(0,totalPages-1);
+  const start=txPage*pageSize;
+  const end=Math.min(start+pageSize,total);
+
+  // Date range of visible records
+  const visible=all.slice(start,end);
+  let dateRange='';
+  if(visible.length){
+    const dates=visible.map(t=>t.date).sort();
+    const oldest=new Date(dates[0]+'T00:00:00');
+    const newest=new Date(dates[dates.length-1]+'T00:00:00');
+    const fmtD=d=>d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    dateRange=dates[0]===dates[dates.length-1]
+      ? fmtD(oldest)
+      : fmtD(oldest)+' – '+fmtD(newest);
+  }
+
+  // Update label: "Page 2 of 5  (51–100 of 243)"
+  const lbl=document.getElementById('tx-page-lbl');
+  const range=document.getElementById('tx-page-range');
+  const summary=document.getElementById('tx-page-summary');
+  const prev=document.getElementById('tx-page-prev');
+  const next=document.getElementById('tx-page-next');
+
+  if(txPageSize===0){
+    if(lbl) lbl.textContent='All '+total+' records';
+    if(range) range.textContent=dateRange;
+  } else {
+    if(lbl) lbl.textContent='Page '+(txPage+1)+' of '+totalPages+'  ('+(start+1)+'–'+end+' of '+total+')';
+    if(range) range.textContent=dateRange;
+  }
+
+  // Totals for visible page
+  const exp=visible.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const inc=visible.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  if(summary){
+    if(!visible.length){ summary.innerHTML=''; }
+    else {
+      let parts=[];
+      if(inc>0) parts.push('<span style="color:var(--accent)">Income: '+fmt(inc)+'</span>');
+      if(exp>0) parts.push('<span style="color:var(--red)">Expenses: '+fmt(exp)+'</span>');
+      summary.innerHTML=parts.join(' · ');
+    }
+  }
+
+  // Disable prev/next when at edges
+  if(prev) prev.disabled=txPage<=0;
+  if(next) next.disabled=txPageSize===0||txPage>=totalPages-1;
+  if(prev) prev.style.opacity=txPage<=0?'0.3':'1';
+  if(next) next.style.opacity=(txPageSize===0||txPage>=totalPages-1)?'0.3':'1';
+}
+
 function renderTransactions(){
   // Always rebuild category dropdowns so new categories appear immediately
   populateCatDropdowns();
@@ -2033,8 +2932,16 @@ function renderTx(){
   const cat=document.getElementById('f-cat').value,src=document.getElementById('f-src').value,srch=document.getElementById('f-search').value.toLowerCase();
   let rows=[...TRANSACTIONS].sort((a,b)=>b.date.localeCompare(a.date));
   if(txTypeFilter)rows=rows.filter(t=>t.type===txTypeFilter);
+  // Apply paging
   if(cat)rows=rows.filter(t=>t.cat===cat);if(src)rows=rows.filter(t=>t.source===src);
   if(srch)rows=rows.filter(t=>t.desc.toLowerCase().includes(srch)||t.cat.includes(srch));
+  const totalFiltered=rows.length;
+  const pageSize=txPageSize||totalFiltered;
+  const totalPages=pageSize?Math.ceil(totalFiltered/pageSize):1;
+  if(txPage>=totalPages) txPage=Math.max(0,totalPages-1);
+  rows=rows.slice(txPage*pageSize,txPage*pageSize+pageSize);
+  updateTxPageUI();
+  // Remove duplicate filter application below
   const tbody=document.getElementById('tx-tbody'),empty=document.getElementById('tx-empty');
   if(!rows.length){tbody.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
@@ -2054,7 +2961,7 @@ function renderTx(){
         +(t.recurring?' <span style="font-size:13px" title="Recurring">🔁</span>':'')
         +(t.prepaid?' <span class="badge bb" style="font-size:10px" title="Prepaid '+( t.prepaidMonths||12)+' months — '+fmt((t.amount||0)/(t.prepaidMonths||12))+'/mo">📅 prepaid</span>':'')
       +'</td>'
-      +'<td style="font-size:16px">'+(si[t.source]||'')+'</td>'
+      +'<td style="font-size:16px" class="tx-col-method">'+(si[t.source]||'')+'</td>'
       +'<td style="text-align:right;font-weight:600;color:'+col+';white-space:nowrap">'+prefix+fmtN(t.amount)+'</td>'
       +'<td style="white-space:nowrap">'
         +'<button onclick="editTx('+t.id+')" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:2px 5px;font-size:12px" title="Edit">✎</button>'
@@ -2431,7 +3338,7 @@ function renderCF(mode){
   const recur=Object.entries(spend).filter(([k])=>k!=='rent'&&k!=='education');
   const opOut=recur.reduce((s,[,v])=>s+v,0),opNet=opIn-opOut;
   const rentP=spend.rent||0,eduP=spend.education||0,netCF=opNet-rentP-eduP;
-  const liq=ACCOUNTS.banks.reduce((s,b)=>s+(b.currency==='PKR'?Math.round(b.balance*(b.pkr_rate||0.013)):b.balance),0);
+  const liq=ACCOUNTS.banks.reduce((s,b)=>s+(Math.round(toAED(b.balance,b.currency))),0);
   const floor=calcFloor();
   document.getElementById('cf-table').innerHTML=`<div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">Cash Flow — ${lbl}</div><table><tbody><tr class="st-h"><td colspan="2">Operating Activities</td></tr><tr><td class="st-i">Salary received</td><td style="text-align:right">${fmtN(INCOME.salary*(mode==='quarterly'?3:1))}</td></tr><tr><td class="st-i">Serva returns</td><td style="text-align:right">${fmtN(INCOME.serva*(mode==='quarterly'?3:1))}</td></tr>${recur.filter(([,v])=>v>0).map(([k,v])=>{const c=getCat(k);return `<tr><td class="st-i" style="color:var(--red)">${c.icon} ${c.name}</td><td style="text-align:right;color:var(--red)">(${fmtN(v)})</td></tr>`;}).join('')}<tr class="st-s"><td>Net Operating</td><td style="text-align:right;color:${opNet>=0?'var(--accent)':'var(--red)'}">${opNet>=0?fmtN(opNet):'('+fmtN(-opNet)+')'}</td></tr>${(rentP||eduP)?`<tr><td colspan="2" style="height:5px"></td></tr><tr class="st-h"><td colspan="2">Periodic Obligations</td></tr>${rentP?`<tr><td class="st-i" style="color:var(--red)">🏠 Rent paid</td><td style="text-align:right;color:var(--red)">(${fmtN(rentP)})</td></tr>`:''}${eduP?`<tr><td class="st-i" style="color:var(--red)">🎓 Education paid</td><td style="text-align:right;color:var(--red)">(${fmtN(eduP)})</td></tr>`:''}<tr class="st-s"><td>Net Periodic</td><td style="text-align:right;color:var(--red)">(${fmtN(rentP+eduP)})</td></tr>`:'<tr><td class="st-i muted" style="padding:7px 9px 7px 20px">No periodic payments this period</td><td></td></tr>'}<tr><td colspan="2" style="height:2px;background:var(--border)"></td></tr><tr class="st-t"><td>Net Cash Flow</td><td style="text-align:right;color:${netCF>=0?'var(--accent)':'var(--red)'}">${netCF>=0?fmtN(netCF):'('+fmtN(-netCF)+')'}</td></tr></tbody></table>`;
   document.getElementById('cf-pos').innerHTML=`<div class="row"><span class="muted sm">Bank balances</span><span class="f500">${fmt(liq)}</span></div><div class="row"><span class="muted sm">Period net</span><span class="f500" style="color:${netCF>=0?'var(--accent)':'var(--red)'}">${netCF>=0?'+':''}${fmt(netCF)}</span></div><div class="row"><span class="muted sm">Emergency runway</span><span class="f500">${(liq/floor.total).toFixed(1)} months</span></div><div class="${mode==='monthly'?'warn':'tip'} mt8">${mode==='monthly'?'Monthly view only shows actual payments made. Switch to Quarterly to see a rent+fees month.':'Full quarterly picture including all periodic obligations.'}</div>`;
@@ -2475,7 +3382,7 @@ function renderProjection(){
 
   // Starting liquid balance from all bank accounts
   const startBalance=ACCOUNTS.banks.reduce((s,b)=>
-    s+(b.currency==='PKR'?Math.round(b.balance*(b.pkr_rate||0.013)):b.balance),0);
+    s+(Math.round(toAED(b.balance,b.currency))),0);
 
   // Monthly operating figures from budgets
   const monthlyIncome=INCOME.salary+INCOME.serva+INCOME.other;
@@ -2721,7 +3628,7 @@ function exportInsights(){
 // ═══════════════════════════════════════════════════════════
 function renderRisk(){
   const inc=INCOME.salary+INCOME.serva+INCOME.other,exp=Object.values(allExpByCat()).reduce((s,v)=>s+v,0),sr=(inc-exp)/inc;
-  const floor=calcFloor(),nw=calcNW(),liq=ACCOUNTS.banks.reduce((s,b)=>s+(b.currency==='PKR'?Math.round(b.balance*(b.pkr_rate||0.013)):b.balance),0),runway=(liq/floor.total).toFixed(1);
+  const floor=calcFloor(),nw=calcNW(),liq=ACCOUNTS.banks.reduce((s,b)=>s+(Math.round(toAED(b.balance,b.currency))),0),runway=(liq/floor.total).toFixed(1);
   const urgentObl=OBLIGATIONS.filter(o=>oblDaysRemaining(o)<=30);
   let score=50;
   if(sr<0.1)score+=20;else if(sr<0.2)score+=10;else if(sr>0.3)score-=10;
@@ -2773,7 +3680,7 @@ function refreshRiskInsights(){
 async function getAIRiskNarrative(){
   if(!getApiKey()){toast('Add your Anthropic API key in Settings → API & Integrations',true);nav('admin',null);setTimeout(()=>switchAdmin('api'),50);return;}
   const inc=INCOME.salary+INCOME.serva,exp=Object.values(allExpByCat()).reduce((s,v)=>s+v,0),nw=calcNW(),floor=calcFloor();
-  const liq=ACCOUNTS.banks.reduce((s,b)=>s+(b.currency==='PKR'?Math.round(b.balance*(b.pkr_rate||0.013)):b.balance),0);
+  const liq=ACCOUNTS.banks.reduce((s,b)=>s+(Math.round(toAED(b.balance,b.currency))),0);
   const oblSummary=OBLIGATIONS.map(o=>`${o.name} ${fmt(o.amount)} ${o.frequency} (${oblDaysRemaining(o)} days to next)`).join(', ');
   document.getElementById('risk-ai-text').innerHTML='<span class="muted sm">Generating analysis…</span>';
   showLoad(true);
@@ -2795,6 +3702,514 @@ function calcZakat(){
   const cash=parseFloat(document.getElementById('zk-cash').value)||0,inv=parseFloat(document.getElementById('zk-inv').value)||0,gold=parseFloat(document.getElementById('zk-gold').value)||0,recv=parseFloat(document.getElementById('zk-recv').value)||0,debt=parseFloat(document.getElementById('zk-debt').value)||0;
   const NISAB=18700,total=cash+inv+gold+recv,zakatable=Math.max(0,total-debt),due=zakatable>=NISAB?zakatable*.025:0,eligible=zakatable>=NISAB;
   document.getElementById('zakat-res').innerHTML=`<div class="row"><span class="muted sm">Total assets</span><strong>${fmt(total)}</strong></div><div class="row"><span class="muted sm">Deductions</span><span class="red">−${fmt(debt)}</span></div><div class="row"><span class="muted sm">Zakatable</span><strong>${fmt(zakatable)}</strong></div><div class="row"><span class="muted sm">Nisab</span><span>${fmt(NISAB)}</span></div><div class="divider"></div>${eligible?`<div style="background:var(--ambl);border-radius:var(--rs);padding:13px;text-align:center"><div style="font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Zakat Due (2.5%)</div><div style="font-size:26px;font-weight:600;color:var(--amber)">${fmt(due)}</div></div>`:'<div class="tip">Below nisab threshold. No Zakat currently due.</div>'}`;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// ANALYTICS PAGE
+// ═══════════════════════════════════════════════════════════
+let analyticsPeriod = 'month';
+
+function switchAnalytics(el, period){
+  analyticsPeriod = period;
+  // Update tab active states
+  ['month','3month','year','all'].forEach(p=>{
+    const t = document.getElementById('an-tab-'+p);
+    if(t) t.classList.toggle('active', p===period);
+  });
+  renderAnalytics();
+}
+
+function getAnalyticsTx(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  if(analyticsPeriod === 'month'){
+    const prefix = y+'-'+String(m+1).padStart(2,'0');
+    return TRANSACTIONS.filter(t=>t.date.startsWith(prefix));
+  }
+  if(analyticsPeriod === '3month'){
+    const cutoff = new Date(y, m-2, 1).toISOString().split('T')[0];
+    return TRANSACTIONS.filter(t=>t.date >= cutoff);
+  }
+  if(analyticsPeriod === 'year'){
+    return TRANSACTIONS.filter(t=>t.date.startsWith(''+y));
+  }
+  return TRANSACTIONS;
+}
+
+function renderAnalytics(){
+  const txs      = getAnalyticsTx();
+  const expenses = txs.filter(t=>t.type==='expense');
+
+  // Daily chart
+  const byDate={}, byCatDate={};
+  expenses.forEach(t=>{
+    byDate[t.date]=(byDate[t.date]||0)+t.amount;
+    if(!byCatDate[t.date]) byCatDate[t.date]={};
+    byCatDate[t.date][t.cat]=(byCatDate[t.date][t.cat]||0)+t.amount;
+  });
+
+  const dates = Object.keys(byDate).sort().slice(-60);
+  const rangeEl = document.getElementById('an-daily-range');
+  if(rangeEl && dates.length>1){
+    const fmt2 = d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    rangeEl.textContent = fmt2(dates[0])+' – '+fmt2(dates[dates.length-1]);
+  }
+
+  const catTotals = {};
+  expenses.forEach(t=>{ catTotals[t.cat]=(catTotals[t.cat]||0)+t.amount; });
+  const topCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,4).map(e=>e[0]);
+  const maxAmt  = Math.max(...dates.map(d=>byDate[d]),1);
+  const barH    = 90;
+  const todayStr = getTodayStr();
+
+  const chartEl = document.getElementById('an-daily-chart');
+  if(chartEl){
+    if(!dates.length){
+      chartEl.innerHTML='<div class="sm muted" style="padding:16px 0">No expense data for this period.</div>';
+    } else {
+      chartEl.innerHTML = '<div style="display:flex;align-items:flex-end;gap:2px;height:'+(barH+48)+'px;overflow-x:auto;padding-bottom:4px;">'
+        +dates.map(d=>{
+          const total=byDate[d], h=Math.max(Math.round((total/maxAmt)*barH),3);
+          const dt=new Date(d+'T00:00:00'), dow=dt.getDay();
+          const isWeekend=dow===0||dow===6, isToday=d===todayStr;
+          const col=isToday?'var(--accent)':isWeekend?'var(--amber)':'var(--muted)';
+          let stacks='', usedH=0;
+          topCats.forEach((cid,i)=>{
+            const ca=(byCatDate[d]&&byCatDate[d][cid])||0;
+            if(!ca) return;
+            const sh=Math.max(Math.round((ca/total)*h),1);
+            stacks='<div style="width:100%;height:'+sh+'px;background:'+getCat(cid).color+';'+(i===0?'border-radius:3px 3px 0 0;':'')+'"></div>'+stacks;
+            usedH+=sh;
+          });
+          const rem=h-usedH;
+          if(rem>0) stacks='<div style="width:100%;height:'+rem+'px;background:var(--surface2);border-radius:3px 3px 0 0;"></div>'+stacks;
+          return '<div style="flex:0 0 auto;width:26px;display:flex;flex-direction:column;align-items:center;gap:2px;" title="'+d+': '+fmt(total)+'">'
+            +'<div style="font-size:9px;color:'+(isToday?'var(--accent)':'var(--muted)')+';">'+(total>999?Math.round(total/100)/10+'k':Math.round(total))+'</div>'
+            +'<div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:'+barH+'px;">'+stacks+'</div>'
+            +'<div style="font-size:9px;color:'+col+';font-weight:'+(isWeekend||isToday?'600':'400')+';">'+dt.getDate()+'</div>'
+            +'<div style="font-size:8px;color:'+col+';">'+['Su','Mo','Tu','We','Th','Fr','Sa'][dow]+'</div>'
+          +'</div>';
+        }).join('')+'</div>'
+        +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">'
+        +topCats.map(cid=>{ const c=getCat(cid); return '<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:2px;background:'+c.color+';display:inline-block"></span>'+c.name+'</span>'; }).join('')
+        +'</div>';
+    }
+  }
+
+  // Category breakdown
+  const sorted = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const mx = Math.max(...sorted.map(s=>s[1]),1);
+  const bycatEl = document.getElementById('an-bycat');
+  if(bycatEl) bycatEl.innerHTML = sorted.map(([cid,amt])=>{
+    const c=getCat(cid), bud=[...BUDGETS.fixed,...BUDGETS.variable].find(b=>b.id===cid), over=bud&&amt>bud.budget;
+    return '<div style="padding:7px 0;border-bottom:1px solid var(--border)"><div class="fb" style="margin-bottom:4px"><span style="font-size:13px">'+c.icon+' '+c.name+'</span><span style="font-size:12px;font-weight:500;color:'+(over?'var(--red)':'var(--text)')+'">'+fmt(amt)+(bud?' <span class="muted" style="font-weight:400">/ '+fmtN(bud.budget)+'</span>':'')+'</span></div><div class="ptrak"><div class="pfill" style="width:'+Math.round(amt/mx*100)+'%;background:'+(over?'var(--red)':c.color)+'"></div></div></div>';
+  }).join('') || '<div class="sm muted">No expense data for this period.</div>';
+
+  // Category summary table
+  const incByCat = {};
+  txs.filter(t=>t.type==='income').forEach(t=>{incByCat[t.cat]=(incByCat[t.cat]||0)+t.amount;});
+  const allC = [...new Set([...Object.keys(catTotals),...Object.keys(incByCat)])];
+  const cattableEl = document.getElementById('an-cattable');
+  if(cattableEl) cattableEl.innerHTML = '<table><thead><tr><th>Category</th><th style="text-align:right">Expense</th><th style="text-align:right">Income</th></tr></thead><tbody>'
+    +allC.map(cid=>{ const c=getCat(cid),e=catTotals[cid]||0,i=incByCat[cid]||0;
+      return '<tr><td><span class="badge" style="background:'+c.bg+';color:'+c.color+';font-size:11px">'+c.icon+' '+c.name+'</span></td>'
+        +'<td style="text-align:right;color:'+(e?'var(--red)':'var(--muted)')+'">'+( e?fmtN(e):'—')+'</td>'
+        +'<td style="text-align:right;color:'+(i?'var(--accent)':'var(--muted)')+'">'+( i?fmtN(i):'—')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+
+  // Recurring
+  const recEl = document.getElementById('an-recurring');
+  if(!recEl) return;
+  const recItems = buildRecurringSummary ? buildRecurringSummary() : [];
+  if(!recItems.length){
+    recEl.innerHTML='<div class="sm muted" style="padding:10px 0">No recurring transactions detected yet. Click <strong>Auto-detect</strong> to scan your history.</div>';
+    return;
+  }
+  const totalMonthly = recItems.reduce((s,i)=>s+i.avg,0);
+  recEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:10px 14px;background:var(--surface2);border-radius:var(--rs);">'
+    +'<span class="sm muted">Total recurring monthly cost:</span>'
+    +'<span style="font-size:16px;font-weight:600;color:var(--red)">'+fmt(totalMonthly)+'/mo</span>'
+    +'</div>'
+    +'<div style="overflow-x:auto;"><table><thead><tr><th>Merchant</th><th>Category</th><th>Seen</th><th style="text-align:right">Avg/mo</th><th>Budget</th></tr></thead><tbody>'
+    +recItems.map(item=>{
+      const c=getCat(item.cat);
+      return '<tr><td style="font-weight:500;font-size:13px">🔁 '+item.desc+'</td>'
+        +'<td><span class="badge" style="background:'+c.bg+';color:'+c.color+';font-size:10px">'+c.icon+' '+c.name+'</span></td>'
+        +'<td class="muted sm">'+item.occurrences+' mo</td>'
+        +'<td style="text-align:right;font-weight:600;color:var(--red)">'+fmt(item.avg)+'</td>'
+        +'<td>'+(item.hasBudget?'<span class="badge bg" style="font-size:10px">✓ budgeted</span>':'<span class="badge" style="background:var(--surface2);color:var(--muted);font-size:10px">no budget</span>')+'</td>'
+      +'</tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
+// ═══════════════════════════════════════════════════════════
+// INVESTMENTS MODULE
+// ═══════════════════════════════════════════════════════════
+// USD_TO_AED replaced by toAED(amount,'USD') using FX_RATES
+let pendingInvestmentImport = [];
+let importTargetInvId = null;
+
+function invToAED(amount, currency){
+  return currency==='USD' ? toAED(amount,'USD') : amount;
+}
+
+// Calculate P&L for an investment from its transaction history
+function calcInvPL(inv){
+  // Use flat INVESTMENT_TRANSACTIONS store; fall back to nested for legacy data
+  let txs = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===inv.id);
+  if(!txs.length) txs=(inv.transactions||[]).map(t=>({
+    ...t, amountNative:t.amount, currency:t.currency||inv.currency||'AED',
+    amountAED:toAED(t.amount, t.currency||inv.currency||'AED')
+  }));
+  if(!txs.length) return {deposited:0,withdrawn:0,dividends:0,fees:0,netIn:0,realised:0,unrealised:0,totalPL:0,pct:0,phases:[]};
+  // Normalise: use amountNative as amount for P&L (all in native currency for accuracy)
+
+  const amt=t=>(t.amountNative!==undefined?t.amountNative:t.amount)||0;
+  const deposited  = txs.filter(t=>t.type==='Deposit').reduce((s,t)=>s+amt(t),0);
+  const withdrawn  = Math.abs(txs.filter(t=>t.type==='Withdrawal').reduce((s,t)=>s+amt(t),0));
+  const dividends  = txs.filter(t=>t.type==='Dividend').reduce((s,t)=>s+amt(t),0);
+  const fees       = txs.filter(t=>t.type==='Fee').reduce((s,t)=>s+amt(t),0);
+  const sells      = txs.filter(t=>t.type==='Sell').reduce((s,t)=>s+amt(t),0);
+
+  // Detect phases (a withdrawal followed by new deposits = new phase)
+  const phases = [];
+  let phStart = null, phDeposited = 0, phWithdrawn = 0, phDivs = 0, phFees = 0;
+  let phaseNum = 1;
+  const sorted = [...txs].sort((a,b)=>a.date.localeCompare(b.date));
+  sorted.forEach(t=>{
+    if(!phStart) phStart = t.date;
+    const a=(t.amountNative!==undefined?t.amountNative:t.amount)||0;
+    if(t.type==='Deposit') phDeposited += a;
+    if(t.type==='Withdrawal'){ phWithdrawn += Math.abs(a); }
+    if(t.type==='Dividend') phDivs += a;
+    if(t.type==='Fee') phFees += a;
+    if(t.type==='Withdrawal' && Math.abs(t.amount) > 100){
+      const phPL = phWithdrawn - phDeposited + phDivs + phFees;
+      phases.push({num:phaseNum,start:phStart,end:t.date,deposited:phDeposited,
+        withdrawn:phWithdrawn,dividends:phDivs,fees:phFees,pl:phPL,
+        pct:phDeposited?phPL/phDeposited*100:0,closed:true});
+      phaseNum++; phStart=null; phDeposited=0; phWithdrawn=0; phDivs=0; phFees=0;
+    }
+  });
+  // Current open phase
+  if(phDeposited > 0){
+    const currentVal = inv.value || 0;
+    const openPL = currentVal - phDeposited + phDivs + phFees;
+    phases.push({num:phaseNum,start:phStart,end:null,deposited:phDeposited,
+      withdrawn:0,dividends:phDivs,fees:phFees,currentVal,pl:openPL,
+      pct:phDeposited?openPL/phDeposited*100:0,closed:false});
+  }
+
+  const closedPL = phases.filter(p=>p.closed).reduce((s,p)=>s+p.pl,0);
+  const openPL   = phases.find(p=>!p.closed)?.pl||0;
+  const totalPL  = closedPL + openPL;
+  const totalIn  = deposited;
+
+  return {deposited,withdrawn,dividends,fees,netIn:deposited-withdrawn,
+    realised:closedPL,unrealised:openPL,totalPL,pct:totalIn?totalPL/totalIn*100:0,phases};
+}
+
+// What would the same deposits have earned at a fixed savings rate?
+function calcSavingsComparison(inv, annualRate){
+  let txs = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===inv.id&&(t.type==='Deposit'||t.type==='Withdrawal'));
+  if(!txs.length) txs=(inv.transactions||[]).filter(t=>t.type==='Deposit'||t.type==='Withdrawal').map(t=>({...t,amountNative:t.amount}));
+  if(!txs.length) return {total:0,gain:0};
+  const sorted=[...txs].sort((a,b)=>a.date.localeCompare(b.date));
+  const today=new Date();
+  let balance=0;
+  let totalInterest=0;
+  sorted.forEach(t=>{
+    const d=new Date(t.date+'T00:00:00');
+    const years=(today-d)/(1000*60*60*24*365.25);
+    const amt=t.type==='Deposit'?t.amount:t.amount; // already negative for withdrawal
+    const tAmt=Math.abs(t.amountNative!==undefined?t.amountNative:t.amount)||0;
+    const interest=tAmt*(Math.pow(1+annualRate/100,years)-1);
+    if(t.type==='Deposit'){ balance+=tAmt; totalInterest+=interest; }
+    else { balance+=amt; }
+  });
+  return {total:balance+totalInterest,gain:totalInterest,balance};
+}
+
+function renderInvestments(){
+  const invs = ACCOUNTS.investments||[];
+  let totalCurrentAED=0, totalInvestedAED=0, totalPLAED=0;
+  invs.forEach(inv=>{
+    const pl=calcInvPL(inv);
+    const r=fxRate(inv.currency);
+    totalCurrentAED  +=(inv.value||0)*r;
+    totalInvestedAED += pl.deposited*r;
+    totalPLAED       += pl.totalPL*r;
+  });
+  // Also simple investments (no tx history)
+  ACCOUNTS.investments.filter(i=>!(i.transactions||[]).length).forEach(i=>{
+    totalCurrentAED+=(i.value||0)*(fxRate(i.currency));
+  });
+
+  const overallPct = totalInvestedAED ? totalPLAED/totalInvestedAED*100 : 0;
+  document.getElementById('inv-metrics').innerHTML=
+    '<div class="metric"><div class="ml">Total Portfolio Value</div><div class="mv green">'+fmt(totalCurrentAED)+'</div><div class="ms">Across all investments</div></div>'
+    +'<div class="metric"><div class="ml">Total Invested</div><div class="mv">'+fmt(totalInvestedAED)+'</div><div class="ms">All deposits</div></div>'
+    +'<div class="metric"><div class="ml">Total P&L</div><div class="mv" style="color:'+(totalPLAED>=0?'var(--accent)':'var(--red)')+'">'+fmt(totalPLAED)+'</div><div class="ms">'+(totalPLAED>=0?'+':'')+overallPct.toFixed(1)+'% overall</div></div>'
+    +'<div class="metric"><div class="ml">Investments</div><div class="mv">'+invs.length+'</div><div class="ms">Active accounts</div></div>';
+
+  // Investment cards
+  const cardsEl=document.getElementById('inv-cards');
+  if(cardsEl&&!cardsEl._delegated){
+    cardsEl.addEventListener('click',handleInvCardClick);
+    cardsEl._delegated=true;
+  }
+  cardsEl.innerHTML = invs.map(inv=>{
+    const pl = calcInvPL(inv);
+    const r  = fxRate(inv.currency);
+    const curr = inv.currency==='USD'?'$':'AED ';
+    const hasTx = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===inv.id).length>0 || (inv.transactions||[]).length>0;
+    const colPL = pl.totalPL>=0?'var(--accent)':'var(--red)';
+
+    // Phase breakdown rows
+    let phasesHtml='';
+    if(pl.phases.length>1){
+      const phRows=pl.phases.map(p=>{
+        const pStart=new Date(p.start+'T00:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+        const pEnd=p.end?new Date(p.end+'T00:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'now';
+        const pBadge=p.closed?'<span class="badge bt" style="font-size:10px">Closed</span>':'<span class="badge bg" style="font-size:10px">Open</span>';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);">'
+          +'<div><span class="sm f500">Phase '+p.num+'</span> '+pBadge
+          +'<div class="sm muted">'+pStart+' – '+pEnd+'</div></div>'
+          +'<div style="text-align:right">'
+          +'<div class="sm f500" style="color:'+(p.pl>=0?'var(--accent)':'var(--red)')+';">'+(p.pl>=0?'+':'')+curr+Math.abs(p.pl).toFixed(0)+'</div>'
+          +'<div class="sm muted">'+(p.pct>=0?'+':'')+p.pct.toFixed(1)+'% · dep '+curr+p.deposited.toFixed(0)+'</div>'
+          +'</div></div>';
+      }).join('');
+      phasesHtml='<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">'
+        +'<div class="sm muted mb6">Phase breakdown</div>'+phRows+'</div>';
+    }
+
+    // Stats grid (only if has transactions)
+    let statsHtml='';
+    if(hasTx){
+      statsHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">'
+        +'<div style="background:var(--surface2);border-radius:var(--rs);padding:8px;text-align:center"><div class="sm muted">Deposited</div><div style="font-size:14px;font-weight:600">'+curr+fmtN(pl.deposited)+'</div></div>'
+        +'<div style="background:var(--surface2);border-radius:var(--rs);padding:8px;text-align:center"><div class="sm muted">Dividends</div><div style="font-size:14px;font-weight:600;color:var(--accent)">+'+curr+fmtN(pl.dividends)+'</div></div>'
+        +'<div style="background:var(--surface2);border-radius:var(--rs);padding:8px;text-align:center"><div class="sm muted">Fees</div><div style="font-size:14px;font-weight:600;color:var(--red)">'+curr+fmtN(Math.abs(pl.fees))+'</div></div>'
+        +'<div style="background:'+(pl.totalPL>=0?'var(--al)':'#fdecea')+';border-radius:var(--rs);padding:8px;text-align:center">'
+          +'<div class="sm muted">Total P&L</div>'
+          +'<div style="font-size:14px;font-weight:600;color:'+colPL+'">'+(pl.totalPL>=0?'+':'')+curr+fmtN(Math.abs(pl.totalPL))+'</div>'
+          +'<div style="font-size:10px;color:'+colPL+'">'+(pl.pct>=0?'+':'')+pl.pct.toFixed(1)+'%</div>'
+        +'</div>'
+      +'</div>'+phasesHtml;
+    } else {
+      statsHtml='<div class="sm muted" style="padding:4px 0">No transaction history. '
+        '<button class="btn bsm bg_" onclick="openImportInvestmentModal(\''+inv.id+'\')">Import transactions</button></div>';
+    }
+
+    return '<div class="card sg">'
+      +'<div class="fb mb10">'
+        +'<div>'
+          +'<div style="font-size:16px;font-weight:600">'+inv.name+'</div>'
+          +'<div class="sm muted">'+inv.platform+' · '+inv.currency+(inv.currency!=='AED'?' (×'+fxRate(inv.currency).toFixed(3)+' AED)':'')+'</div>'
+        +'</div>'
+        +'<div style="text-align:right">'
+          +'<div style="font-size:22px;font-weight:600;color:var(--accent)">'+(inv.currency==='USD'?'$'+fmtN(inv.value||0):fmt(inv.value||0))+'</div>'
+          +'<div class="sm muted">current value</div>'
+        +'</div>'
+      +'</div>'
+      +statsHtml
+      +buildInvTxSection(inv)
+      +'</div>';
+  }).join('');
+
+  renderInvestmentComparison();
+  // Sync current portfolio value to projection start field
+  const sarwaOrFirst=(ACCOUNTS.investments||[]).find(i=>INVESTMENT_TRANSACTIONS.some(t=>t.investmentId===i.id));
+  const projStart=document.getElementById('proj-start');
+  if(projStart&&sarwaOrFirst&&!projStart._userSet) projStart.value=Math.round(sarwaOrFirst.value||0);
+}
+
+function renderInvestmentComparison(){
+  const rate = parseFloat(document.getElementById('inv-savings-rate')?.value)||4.5;
+  const el   = document.getElementById('inv-comparison');
+  if(!el) return;
+
+  const invs = (ACCOUNTS.investments||[]).filter(i=>(i.transactions||[]).length>0);
+  if(!invs.length){ el.innerHTML='<div class="sm muted">No investment history to compare.</div>'; return; }
+
+  let rows='';
+  let totalActualPL=0, totalSavingsPL=0, totalDeposited=0;
+
+  invs.forEach(inv=>{
+    const pl   = calcInvPL(inv);
+    const comp = calcSavingsComparison(inv, rate);
+    const curr = inv.currency==='USD'?'$':'AED ';
+    const actualPL  = pl.totalPL;
+    const savingsPL = comp.gain;
+    const diff      = actualPL - savingsPL;
+    totalActualPL  += actualPL*(fxRate(inv.currency));
+    totalSavingsPL += savingsPL*(fxRate(inv.currency));
+    totalDeposited += pl.deposited*(fxRate(inv.currency));
+
+    rows+=`<tr>
+      <td style="font-weight:500">${inv.name}</td>
+      <td class="muted sm">${curr}${fmtN(pl.deposited)}</td>
+      <td style="color:${actualPL>=0?'var(--accent)':'var(--red)'};font-weight:500">${actualPL>=0?'+':''}${curr}${fmtN(Math.abs(actualPL))} (${pl.pct>=0?'+':''}${pl.pct.toFixed(1)}%)</td>
+      <td style="color:var(--amber);font-weight:500">+${curr}${fmtN(savingsPL)} (+${(savingsPL/pl.deposited*100).toFixed(1)}%)</td>
+      <td style="font-weight:600;color:${diff>=0?'var(--accent)':'var(--red)'}">${diff>=0?'+':''}${curr}${fmtN(Math.abs(diff))}</td>
+    </tr>`;
+  });
+
+  const totalDiff=totalActualPL-totalSavingsPL;
+  el.innerHTML=`<div style="overflow-x:auto;"><table>
+    <thead><tr><th>Account</th><th>Invested</th><th>Actual P&L</th><th>At ${rate}% savings</th><th>Difference</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr style="background:var(--surface2);font-weight:600">
+      <td>Total</td>
+      <td class="muted sm">${fmt(totalDeposited)}</td>
+      <td style="color:${totalActualPL>=0?'var(--accent)':'var(--red)'}">${totalActualPL>=0?'+':''}${fmt(Math.abs(totalActualPL))}</td>
+      <td style="color:var(--amber)">+${fmt(totalSavingsPL)}</td>
+      <td style="color:${totalDiff>=0?'var(--accent)':'var(--red)'}">${totalDiff>=0?'▲ +':'▼ '}${fmt(Math.abs(totalDiff))}</td>
+    </tr></tfoot>
+  </table></div>
+  <div style="margin-top:12px;padding:10px 14px;background:${totalDiff>=0?'var(--al)':'var(--ambl)'};border-radius:var(--rs);font-size:13px;color:${totalDiff>=0?'var(--accent)':'#7a5a1a'}">
+    ${totalDiff>=0
+      ?'✓ Your investments beat a '+rate+'% savings account by '+fmt(Math.abs(totalDiff))+'. Market risk paid off.'
+      :'⚠ A '+rate+'% savings account would have earned you '+fmt(Math.abs(totalDiff))+' more with zero risk. Consider reviewing your investment strategy or risk profile.'}
+  </div>`;
+}
+
+// ── Import ──────────────────────────────────────────────────
+function openImportInvestmentModal(invId){
+  const sel=document.getElementById('inv-import-account');
+  if(sel){
+    sel.innerHTML=(ACCOUNTS.investments||[]).map(i=>'<option value="'+i.id+'"'+(i.id===invId?' selected':'')+'>'+i.name+'</option>').join('');
+  }
+  // Auto-set currency to match the selected account
+  const inv=(ACCOUNTS.investments||[]).find(i=>i.id===invId);
+  const curSel=document.getElementById('inv-import-currency');
+  if(curSel&&inv?.currency){
+    // Try to select matching option, fall back to first
+    const opt=[...curSel.options].find(o=>o.value===inv.currency);
+    if(opt) curSel.value=inv.currency;
+  }
+  document.getElementById('inv-import-preview').style.display='none';
+  document.getElementById('inv-import-confirm').style.display='none';
+  pendingInvestmentImport=[];
+  document.getElementById('inv-import-modal').classList.add('show');
+}
+
+function handleInvestmentImport(event){
+  const file=event.target.files[0];
+  if(!file) return;
+
+  // Load SheetJS if not already loaded, then parse
+  function doParseWithSheetJS(arrayBuffer){
+    const XLSX=window.XLSX;
+    const wb=XLSX.read(arrayBuffer,{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'YYYY-MM-DD'});
+    if(!rows.length){ toast('Empty spreadsheet',true); return; }
+
+    // Find header row (row with Date and Type columns)
+    let headerIdx=rows.findIndex(r=>r.some(c=>(c+'').toLowerCase().includes('date'))&&r.some(c=>(c+'').toLowerCase().includes('type')));
+    if(headerIdx===-1) headerIdx=0;
+    const headers=rows[headerIdx].map(h=>(h+'').toLowerCase().trim());
+    const dateCol=headers.findIndex(h=>h.includes('date'));
+    const typeCol=headers.findIndex(h=>h.includes('type'));
+    const amtCol =headers.findIndex(h=>h.includes('amount'));
+    if(dateCol===-1||typeCol===-1||amtCol===-1){
+      toast('Could not find Date/Type/Amount columns. Headers found: '+headers.join(', '),true);
+      return;
+    }
+
+    pendingInvestmentImport=rows.slice(headerIdx+1).map(r=>{
+      if(!r[typeCol]||!r[amtCol]) return null;
+      const rawDate=r[dateCol]+'';
+      let isoDate=getTodayStr();
+      // Handle various date formats
+      try{
+        const d=new Date(rawDate);
+        if(!isNaN(d)){
+          isoDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        }
+      }catch(ex){}
+      const amt=parseFloat((r[amtCol]+'').replace(/[,$]/g,''))||0;
+      const type=(r[typeCol]+'').trim();
+      if(!type||amt===0) return null;
+      return {date:isoDate,type,amount:amt};
+    }).filter(Boolean);
+
+    showImportPreview();
+  }
+
+  function showImportPreview(){
+    const previewEl=document.getElementById('inv-import-table');
+    const countEl=document.getElementById('inv-import-count');
+    if(countEl) countEl.textContent=pendingInvestmentImport.length+' transactions found';
+    if(previewEl) previewEl.innerHTML='<table><thead><tr><th>Date</th><th>Type</th><th style="text-align:right">Amount</th></tr></thead><tbody>'
+      +pendingInvestmentImport.slice(0,10).map(t=>'<tr><td class="sm muted">'+t.date+'</td><td>'+t.type+'</td><td style="text-align:right;color:'+(t.amount<0?'var(--red)':'var(--accent)')+'">'+t.amount.toFixed(2)+'</td></tr>').join('')
+      +(pendingInvestmentImport.length>10?'<tr><td colspan="3" class="sm muted" style="text-align:center">...and '+(pendingInvestmentImport.length-10)+' more</td></tr>':'')
+      +'</tbody></table>';
+    document.getElementById('inv-import-preview').style.display='block';
+    document.getElementById('inv-import-confirm').style.display='block';
+    showLoad(false);
+  }
+
+  showLoad(true);
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      if(window.XLSX){
+        doParseWithSheetJS(e.target.result);
+      } else {
+        // Load SheetJS CDN dynamically
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=()=>doParseWithSheetJS(e.target.result);
+        s.onerror=()=>{ toast('Could not load Excel parser. Try saving as CSV first.',true); showLoad(false); };
+        document.head.appendChild(s);
+      }
+    }catch(err){ toast('Parse error: '+err.message,true); showLoad(false); }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value='';
+}
+
+function confirmInvestmentImport(){
+  const invId=document.getElementById('inv-import-account')?.value;
+  const inv=(ACCOUNTS.investments||[]).find(i=>i.id===invId);
+  if(!inv){ toast('Select an account',true); return; }
+  const currency=document.getElementById('inv-import-currency')?.value||inv.currency||'AED';
+  const rate=fxRate(currency);
+
+  let added=0, dupes=0;
+  pendingInvestmentImport.forEach(t=>{
+    const amtNative=t.amount;
+    const amtAED=toAED(amtNative, currency);
+    // Deduplicate: same investmentId + date + type + amount (within 0.01)
+    const isDupe=INVESTMENT_TRANSACTIONS.some(x=>
+      x.investmentId===invId &&
+      x.date===t.date &&
+      x.type===t.type &&
+      Math.abs((x.amountNative||0)-amtNative)<0.01
+    );
+    if(isDupe){ dupes++; return; }
+    INVESTMENT_TRANSACTIONS.push({
+      id:'itx'+Date.now()+Math.random().toString(36).slice(2,7),
+      investmentId:invId,
+      date:t.date,
+      type:t.type,
+      amountNative:amtNative,
+      currency,
+      amountAED:amtAED,
+      note:''
+    });
+    added++;
+  });
+
+  scheduleSave();
+  closeModal('inv-import-modal');
+  renderInvestments();
+  toast(added+' imported'+(dupes?' · '+dupes+' duplicates skipped':'')+'  into '+inv.name+' ✓');
+  pendingInvestmentImport=[];
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2990,7 +4405,7 @@ function switchAdmin(tab){
   if(tab==='alerts')renderAlerts();
 }
 function renderAccountLists(){
-  const fmtB=b=>{const aed=b.currency==='PKR'?Math.round(b.balance*(b.pkr_rate||0.013)):b.balance;return b.currency==='PKR'?`${fmtN(b.balance)} PKR (${fmt(aed)})`:fmt(aed);};
+  const fmtB=b=>{const aed=Math.round(toAED(b.balance,b.currency));return b.currency==='PKR'?`${fmtN(b.balance)} PKR (${fmt(aed)})`:fmt(aed);};
   const cashEl=document.getElementById('cash-list');
   if(cashEl) cashEl.innerHTML=(ACCOUNTS.cash||[]).map(c=>`<div class="acct-item"><div style="flex:1"><div class="acct-name">${c.name}</div><div class="acct-sub">Cash · ${c.currency}</div></div><div class="acct-val">${fmt(c.balance)}</div><button class="btn bg_ bsm" onclick="openEntityModal('cash','${c.id}')">Edit</button></div>`).join('')||'<div class="sm muted">No cash accounts</div>';
   document.getElementById('bank-list').innerHTML=ACCOUNTS.banks.map(b=>`<div class="acct-item"><div style="flex:1"><div class="acct-name">${b.name}</div><div class="acct-sub">${b.number} · ${b.type} · ${b.currency}</div></div><div class="acct-val">${fmtB(b)}</div><button class="btn bg_ bsm" onclick="openEntityModal('bank','${b.id}')">Edit</button></div>`).join('')||'<div class="sm muted">None</div>';
@@ -3025,7 +4440,7 @@ function openEntityModal(type,id){
   document.getElementById('em-save').onclick=saveEntity;document.getElementById('em-delete').onclick=deleteEntity;
   let html='';
   if(type==='cash')html=`<div class="field"><label class="lbl">Name</label><input type="text" id="em-name" value="${item?.name||''}"></div><div class="g2" style="gap:9px"><div class="field"><label class="lbl">Current Amount (AED)</label><input type="number" id="em-cash-bal" value="${item?.balance||0}"></div><div class="field"><label class="lbl">Currency</label><select id="em-cash-cur" style="width:100%"><option>AED</option><option>PKR</option><option>USD</option></select></div></div>`;
-  else if(type==='bank')html=`<div class="field"><label class="lbl">Account Name</label><input type="text" id="em-name" value="${item?.name||''}"></div><div class="g2" style="gap:9px"><div class="field"><label class="lbl">Balance</label><input type="number" id="em-bal" value="${item?.balance||0}"></div><div class="field"><label class="lbl">Currency</label><select id="em-cur" style="width:100%" onchange="document.getElementById('em-pkr-row').style.display=this.value==='PKR'?'block':'none'"><option ${item?.currency==='AED'?'selected':''}>AED</option><option ${item?.currency==='PKR'?'selected':''}>PKR</option><option ${item?.currency==='USD'?'selected':''}>USD</option></select></div></div><div id="em-pkr-row" style="display:${item?.currency==='PKR'?'block':'none'}"><div class="field"><label class="lbl">PKR→AED Rate</label><input type="number" id="em-pkrrate" step="0.001" value="${item?.pkr_rate||0.013}"></div></div><div class="field"><label class="lbl">Account Number (masked)</label><input type="text" id="em-num" value="${item?.number||''}"></div>`;
+  else if(type==='bank') html=`<div class="field"><label class="lbl">Account Name</label><input type="text" id="em-name" value="${item?.name||''}"></div><div class="g2" style="gap:9px"><div class="field"><label class="lbl">Balance</label><input type="number" id="em-bal" value="${item?.balance||0}"></div><div class="field"><label class="lbl">Currency</label><select id="em-cur" style="width:100%" onchange="updateBankModalRate(this.value)">${['AED','USD','EUR','GBP','PKR','INR','SAR'].map(c=>'<option '+(item?.currency===c?'selected':'')+'>'+c+'</option>').join('')}</select></div></div><div class="field"><label class="lbl">Account Number</label><input type="text" id="em-num" value="${item?.number||''}"></div><div class="field" id="em-rate-row" style="${item?.currency&&item.currency!=='AED'?'':'display:none'}"><label class="lbl">1 <span id="em-rate-cur">${item?.currency||''}</span> = <input type="number" id="em-fxrate" step="0.0001" value="${item?.currency&&item.currency!=='AED'?fxRate(item.currency).toFixed(4):'0'}" style="width:90px;display:inline-block"> AED</label><div class="sm muted mt4">Updates the global rate for this currency.</div></div>`;
   else if(type==='investment')html=`<div class="field"><label class="lbl">Name</label><input type="text" id="em-name" value="${item?.name||''}"></div><div class="field"><label class="lbl">Platform</label><input type="text" id="em-platform" value="${item?.platform||''}"></div><div class="g2" style="gap:9px"><div class="field"><label class="lbl">Current Value (AED)</label><input type="number" id="em-val" value="${item?.value||0}"></div><div class="field"><label class="lbl">Monthly Return (AED)</label><input type="number" id="em-ret" value="${item?.monthly_return||0}"></div></div>`;
   else if(type==='property')html=`<div class="field"><label class="lbl">Property Name</label><input type="text" id="em-name" value="${item?.name||''}"></div><div class="field"><label class="lbl">Location</label><input type="text" id="em-loc" value="${item?.location||''}"></div><div class="g2" style="gap:9px"><div class="field"><label class="lbl">Est. Value (PKR)</label><input type="number" id="em-pkrval" value="${item?.est_value_pkr||0}" oninput="document.getElementById('em-aedval').value=Math.round(this.value*0.013)"></div><div class="field"><label class="lbl">Est. Value (AED)</label><input type="number" id="em-aedval" value="${item?.est_value_aed||0}"></div></div><div class="field"><label class="lbl">Used By</label><input type="text" id="em-usedby" value="${item?.used_by||''}"></div><div class="field"><label class="lbl">Status</label><input type="text" id="em-status" value="${item?.status||''}"></div>`;
   else if(type==='liability')html=`<div class="field"><label class="lbl">Description</label><input type="text" id="em-name" value="${item?.name||''}"></div><div class="field"><label class="lbl">Amount (AED)</label><input type="number" id="em-amt2" value="${item?.amount||0}"></div>`;
@@ -3037,7 +4452,13 @@ function saveEntity(){
   const{type,id}=entityModalCtx,isNew=id==='new';
   const g=n=>document.getElementById(n)?.value||'',gn=n=>parseFloat(document.getElementById(n)?.value)||0;
   if(type==='cash'){if(!ACCOUNTS.cash)ACCOUNTS.cash=[];const obj={id:isNew?'c'+Date.now():id,name:g('em-name'),balance:gn('em-cash-bal'),currency:g('em-cash-cur')||'AED'};if(isNew)ACCOUNTS.cash.push(obj);else Object.assign(ACCOUNTS.cash.find(c=>c.id===id)||{},obj);}
-  else if(type==='bank'){const obj={id:isNew?'b'+Date.now():id,name:g('em-name'),number:g('em-num'),balance:gn('em-bal'),currency:g('em-cur'),type:'current',pkr_rate:gn('em-pkrrate')||0.013};if(isNew)ACCOUNTS.banks.push(obj);else Object.assign(ACCOUNTS.banks.find(b=>b.id===id)||{},obj);}
+  else if(type==='bank'){
+    const cur=g('em-cur')||'AED';
+    const fxVal=parseFloat(document.getElementById('em-fxrate')?.value)||0;
+    if(cur!=='AED'&&fxVal>0) FX_RATES[cur]=fxVal; // update global rate
+    const obj={id:isNew?'b'+Date.now():id,name:g('em-name'),number:g('em-num'),balance:gn('em-bal'),currency:cur,type:'current'};
+    if(isNew)ACCOUNTS.banks.push(obj);else Object.assign(ACCOUNTS.banks.find(b=>b.id===id)||{},obj);
+  }
   else if(type==='investment'){const obj={id:isNew?'i'+Date.now():id,name:g('em-name'),platform:g('em-platform'),value:gn('em-val'),monthly_return:gn('em-ret')};if(isNew)ACCOUNTS.investments.push(obj);else Object.assign(ACCOUNTS.investments.find(i=>i.id===id)||{},obj);}
   else if(type==='property'){const obj={id:isNew?'p'+Date.now():id,name:g('em-name'),location:g('em-loc'),est_value_pkr:gn('em-pkrval'),est_value_aed:gn('em-aedval'),used_by:g('em-usedby'),status:g('em-status')};if(isNew)ACCOUNTS.properties.push(obj);else Object.assign(ACCOUNTS.properties.find(p=>p.id===id)||{},obj);}
   else if(type==='liability'){const obj={id:isNew?'l'+Date.now():id,name:g('em-name'),amount:gn('em-amt2')};if(isNew)ACCOUNTS.liabilities.push(obj);else Object.assign(ACCOUNTS.liabilities.find(l=>l.id===id)||{},obj);}
@@ -3075,6 +4496,504 @@ const API_KEY_STORAGE = 'mizan_anthropic_key';
 
 function getApiKey(){
   return localStorage.getItem(API_KEY_STORAGE) || '';
+}
+
+function deleteInvTxDirect(invId, txId){
+  const idx = INVESTMENT_TRANSACTIONS.findIndex(t=>t.id===txId);
+  if(idx===-1){ toast('Transaction not found',true); return; }
+  const tx = INVESTMENT_TRANSACTIONS[idx];
+  if(!confirm('Delete '+tx.type+' of '+Math.abs(tx.amountNative||0).toFixed(2)+' '+tx.currency+' on '+tx.date+'?')) return;
+  INVESTMENT_TRANSACTIONS.splice(idx,1);
+  scheduleSave();
+  renderInvestments();
+  toast('Deleted ✓');
+}
+
+function resetInvTxDirect(invId, invName){
+  // Find all matching — try exact id first, then by name if id fails
+  let matching = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===invId);
+  if(!matching.length){
+    // Fallback: find by account name
+    const inv=(ACCOUNTS.investments||[]).find(i=>i.name===invName||i.id===invId);
+    if(inv) matching=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===inv.id);
+  }
+  const count=matching.length;
+  if(!count){ toast('No transactions found for '+invName,true); return; }
+  if(!confirm('Delete ALL '+count+' transactions for '+invName+'? This cannot be undone.')) return;
+
+  // Remove by txId rather than filtering by investmentId (more reliable)
+  const txIds=new Set(matching.map(t=>t.id));
+  INVESTMENT_TRANSACTIONS=INVESTMENT_TRANSACTIONS.filter(t=>!txIds.has(t.id));
+  // Clear legacy nested
+  const inv2=(ACCOUNTS.investments||[]).find(i=>i.id===invId||i.name===invName);
+  if(inv2) inv2.transactions=[];
+  _showTxFor[invId]=false;
+  scheduleSave();
+  renderInvestments();
+  toast(invName+': '+count+' transactions deleted ✓');
+}
+
+function debugInvTx(){
+  const invs=(ACCOUNTS.investments||[]);
+  let msg='Investment IDs:\n';
+  invs.forEach(i=>msg+=i.id+' = '+i.name+'\n');
+  msg+='\nFlat TX counts:\n';
+  const counts={};
+  INVESTMENT_TRANSACTIONS.forEach(t=>{counts[t.investmentId]=(counts[t.investmentId]||0)+1;});
+  Object.entries(counts).forEach(([id,n])=>{
+    const inv=invs.find(i=>i.id===id);
+    msg+=id+' ('+( inv?inv.name:'UNKNOWN')+') = '+n+' transactions\n';
+  });
+  if(!INVESTMENT_TRANSACTIONS.length) msg+='No transactions in flat store\n';
+  alert(msg);
+}
+
+// ── Investment layer switching ────────────────────────────
+let _invLayer = 'factual';
+
+function switchInvLayer(layer, el){
+  _invLayer = layer;
+  ['factual','analysis','projection'].forEach(l=>{
+    const tab=document.getElementById('inv-tab-'+l);
+    const div=document.getElementById('inv-layer-'+l);
+    if(tab) tab.classList.toggle('active', l===layer);
+    if(div) div.style.display=l===layer?'block':'none';
+  });
+  if(layer==='analysis')  renderInvAnalysis();
+  if(layer==='projection') renderInvProjection();
+}
+
+// ══════════════════════════════════════════════════════════
+// ANALYSIS LAYER
+// ══════════════════════════════════════════════════════════
+function renderInvAnalysis(){
+  const sel = document.getElementById('inv-analysis-account');
+  if(!sel) return;
+
+  // Populate account selector
+  const invs=(ACCOUNTS.investments||[]).filter(i=>
+    INVESTMENT_TRANSACTIONS.some(t=>t.investmentId===i.id)||(i.transactions||[]).length
+  );
+  if(!invs.length){ document.getElementById('inv-analysis-metrics').innerHTML='<div class="sm muted">No investment data yet.</div>'; return; }
+  sel.innerHTML=invs.map(i=>'<option value="'+i.id+'">'+i.name+'</option>').join('');
+  const invId=sel.value;
+  const inv=invs.find(i=>i.id===invId)||invs[0];
+  sel.value=inv.id;
+
+  const pl=calcInvPL(inv);
+  const curr=inv.currency||'AED';
+  const sym=curr==='USD'?'$':'AED ';
+
+  // ── Metrics strip ──────────────────────────────────────
+  const netInvested=pl.deposited-pl.withdrawn;
+  const currentVal=inv.value||0;
+  const unrealisedPL=currentVal-netInvested+(pl.dividends+pl.fees); // fees already negative
+  const roiPct=netInvested?((currentVal-netInvested)/netInvested*100):0;
+  const totalReturn=pl.realised+unrealisedPL;
+
+  document.getElementById('inv-analysis-metrics').innerHTML=
+    '<div class="metrics" style="margin:0 0 16px;">'
+    +'<div class="metric"><div class="ml">Total Deposited</div><div class="mv">'+sym+fmtN(pl.deposited)+'</div><div class="ms">All cash in</div></div>'
+    +'<div class="metric"><div class="ml">Total Withdrawn</div><div class="mv amber">'+sym+fmtN(pl.withdrawn)+'</div><div class="ms">Cash recovered</div></div>'
+    +'<div class="metric"><div class="ml">Net Invested</div><div class="mv">'+sym+fmtN(netInvested)+'</div><div class="ms">Still at risk</div></div>'
+    +'<div class="metric"><div class="ml">Current Value</div><div class="mv green">'+sym+fmtN(currentVal)+'</div><div class="ms">Portfolio today</div></div>'
+    +'<div class="metric"><div class="ml">Total Dividends</div><div class="mv" style="color:var(--accent)">+'+sym+fmtN(pl.dividends)+'</div><div class="ms">Income received</div></div>'
+    +'<div class="metric"><div class="ml">Total Fees</div><div class="mv red">'+sym+fmtN(Math.abs(pl.fees))+'</div><div class="ms">Cost of investing</div></div>'
+    +'<div class="metric"><div class="ml">Net P&L</div><div class="mv" style="color:'+(totalReturn>=0?'var(--accent)':'var(--red)')+'">'+( totalReturn>=0?'+':'')+sym+fmtN(Math.abs(pl.totalPL))+'</div><div class="ms">'+(pl.pct>=0?'+':'')+pl.pct.toFixed(1)+'% total</div></div>'
+    +'<div class="metric"><div class="ml">ROI (open phase)</div><div class="mv" style="color:'+(roiPct>=0?'var(--accent)':'var(--red)')+'">'+( roiPct>=0?'+':'')+roiPct.toFixed(1)+'%</div><div class="ms">On net invested</div></div>'
+    +'</div>';
+
+  // ── Efficiency ─────────────────────────────────────────
+  const feePct = pl.deposited ? Math.abs(pl.fees)/pl.deposited*100 : 0;
+  const divToFee = pl.fees ? pl.dividends/Math.abs(pl.fees) : 0;
+  const divYield  = currentVal ? pl.dividends/currentVal*100 : 0;
+  const effEl=document.getElementById('inv-efficiency');
+  if(effEl) effEl.innerHTML=[
+    {label:'Fees as % of invested', val:feePct.toFixed(2)+'%', note:feePct<1?'✓ Low':'⚠ High', col:feePct<1?'var(--accent)':'var(--amber)'},
+    {label:'Dividends ÷ Fees',      val:divToFee.toFixed(2)+'×', note:divToFee>=1?'✓ Dividends cover fees':'⚠ Fees exceed dividends', col:divToFee>=1?'var(--accent)':'var(--red)'},
+    {label:'Dividend yield (est)',  val:divYield.toFixed(2)+'%', note:'Annualised on current value', col:'var(--text)'},
+    {label:'Cost per AED return',   val:pl.totalPL>0?(Math.abs(pl.fees)/pl.totalPL*100).toFixed(1)+'%':'N/A', note:'Fees as % of total return', col:'var(--muted)'},
+  ].map(r=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);">'
+    +'<div><div style="font-size:13px;font-weight:500">'+r.label+'</div><div class="sm muted">'+r.note+'</div></div>'
+    +'<div style="font-size:18px;font-weight:600;color:'+r.col+'">'+r.val+'</div>'
+  +'</div>').join('');
+
+  // ── Monthly trends bar chart ────────────────────────────
+  const txs=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===inv.id);
+  const byMonth={};
+  txs.forEach(t=>{
+    const mo=t.date.slice(0,7);
+    if(!byMonth[mo]) byMonth[mo]={dep:0,fee:0,div:0,inv:0};
+    const a=Math.abs(t.amountNative||t.amount||0);
+    if(t.type==='Deposit')    byMonth[mo].dep+=a;
+    if(t.type==='Fee')        byMonth[mo].fee+=a;
+    if(t.type==='Dividend')   byMonth[mo].div+=a;
+    if(t.type==='Investment') byMonth[mo].inv+=a;
+  });
+  const months=Object.keys(byMonth).sort();
+  const maxDep=Math.max(...months.map(m=>byMonth[m].dep),1);
+  const barH=60;
+  const trendsEl=document.getElementById('inv-monthly-trends');
+  if(trendsEl) trendsEl.innerHTML = months.length
+    ? '<div style="display:flex;align-items:flex-end;gap:3px;height:'+(barH+40)+'px;overflow-x:auto;">'
+      +months.map(mo=>{
+        const d=byMonth[mo],h=Math.max(Math.round((d.dep/maxDep)*barH),2);
+        const label=mo.slice(5)+'/'+mo.slice(2,4);
+        return '<div style="flex:0 0 auto;width:32px;display:flex;flex-direction:column;align-items:center;gap:2px;">'
+          +'<div style="font-size:8px;color:var(--muted)">'+sym+Math.round(d.dep)+'</div>'
+          +'<div style="width:100%;height:'+h+'px;background:var(--accent);border-radius:3px 3px 0 0;" title="'+mo+': dep '+sym+d.dep.toFixed(0)+'"></div>'
+          +'<div style="font-size:8px;color:var(--muted);transform:rotate(-45deg);margin-top:4px;white-space:nowrap;">'+label+'</div>'
+        +'</div>';
+      }).join('')+'</div>'
+      +'<div class="fi mt8" style="gap:12px;flex-wrap:wrap;">'
+        +'<span class="sm muted">Total deposited: '+sym+fmtN(pl.deposited)+'</span>'
+        +'<span class="sm muted">Total fees: '+sym+fmtN(Math.abs(pl.fees))+'</span>'
+        +'<span class="sm muted">Total dividends: '+sym+fmtN(pl.dividends)+'</span>'
+      +'</div>'
+    : '<div class="sm muted">No monthly data</div>';
+
+  // ── Transaction breakdown ─────────────────────────────
+  const types=['Deposit','Investment','Dividend','Withdrawal','Fee','Sell'];
+  const txEl=document.getElementById('inv-tx-breakdown');
+  if(txEl) txEl.innerHTML='<div style="overflow-x:auto;"><table><thead><tr><th>Type</th><th style="text-align:right">Count</th><th style="text-align:right">Total</th><th style="text-align:right">Average</th></tr></thead><tbody>'
+    +types.map(type=>{
+      const rows=txs.filter(t=>t.type===type);
+      if(!rows.length) return '';
+      const total=rows.reduce((s,t)=>s+Math.abs(t.amountNative||t.amount||0),0);
+      const avg=total/rows.length;
+      const isNeg=type==='Fee'||type==='Withdrawal';
+      return '<tr>'
+        +'<td>'+{Deposit:'↓ Deposit',Withdrawal:'↑ Withdrawal',Dividend:'★ Dividend',Fee:'⚠ Fee',Investment:'→ Investment',Sell:'← Sell'}[type]+'</td>'
+        +'<td style="text-align:right;color:var(--muted)">'+rows.length+'</td>'
+        +'<td style="text-align:right;font-weight:500;color:'+(isNeg?'var(--red)':'var(--text)')+'">'+sym+fmtN(total)+'</td>'
+        +'<td style="text-align:right;color:var(--muted)">'+sym+avg.toFixed(2)+'</td>'
+      +'</tr>';
+    }).join('')
+    +'</tbody></table></div>';
+}
+
+// ══════════════════════════════════════════════════════════
+// PROJECTIONS LAYER
+// ══════════════════════════════════════════════════════════
+function renderInvProjection(){
+  const monthly  = parseFloat(document.getElementById('proj-monthly')?.value)||500;
+  const annualRet= parseFloat(document.getElementById('proj-return')?.value)||7;
+  const years    = parseInt(document.getElementById('proj-years')?.value)||10;
+  const start    = parseFloat(document.getElementById('proj-start')?.value)||0;
+
+  const monthlyRate = annualRet/100/12;
+  const milestoneTargets=[10000,25000,50000,100000,250000,500000,1000000];
+  const passiveTargets=[500,1000,2000,5000];
+
+  // Generate monthly portfolio values
+  const dataPoints=[];
+  let balance=start;
+  const milestonesHit={};
+
+  for(let m=1;m<=years*12;m++){
+    balance = balance*(1+monthlyRate)+monthly;
+    if(m%12===0 || m===1){
+      dataPoints.push({month:m,year:Math.ceil(m/12),value:balance,deposited:start+monthly*m});
+    }
+    milestoneTargets.forEach(t=>{ if(!milestonesHit[t]&&balance>=t) milestonesHit[t]=m; });
+  }
+
+  const finalVal=balance;
+  const totalDeposited=start+monthly*years*12;
+  const totalGain=finalVal-totalDeposited;
+  const headline=document.getElementById('proj-headline');
+  if(headline) headline.textContent=
+    'After '+years+' yrs: $'+Math.round(finalVal).toLocaleString()
+    +' · Deposited: $'+Math.round(totalDeposited).toLocaleString()
+    +' · Gain: $'+Math.round(totalGain).toLocaleString()+' ('+Math.round(totalGain/totalDeposited*100)+'%)';
+
+  // Bar chart
+  const chartEl=document.getElementById('proj-chart');
+  const maxVal=Math.max(...dataPoints.map(d=>d.value),1);
+  const barH=100;
+  if(chartEl) chartEl.innerHTML='<div style="display:flex;align-items:flex-end;gap:4px;height:'+(barH+50)+'px;overflow-x:auto;">'
+    +dataPoints.map(d=>{
+      const h=Math.max(Math.round((d.value/maxVal)*barH),3);
+      const depH=Math.max(Math.round((d.deposited/maxVal)*barH),2);
+      const gainH=h-Math.min(depH,h);
+      return '<div style="flex:0 0 auto;min-width:36px;display:flex;flex-direction:column;align-items:center;gap:1px;" title="Year '+d.year+': $'+Math.round(d.value).toLocaleString()+'">'
+        +'<div style="font-size:9px;color:var(--muted);">$'+( d.value>999?Math.round(d.value/1000)+'k':Math.round(d.value))+'</div>'
+        +'<div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:'+barH+'px;">'
+          +( gainH>0?'<div style="width:100%;height:'+gainH+'px;background:var(--accent);border-radius:3px 3px 0 0;"></div>':'')
+          +'<div style="width:100%;height:'+Math.min(depH,h)+'px;background:var(--surface2);"></div>'
+        +'</div>'
+        +'<div style="font-size:9px;color:var(--muted);">Y'+d.year+'</div>'
+      +'</div>';
+    }).join('')+'</div>'
+    +'<div class="fi mt8" style="gap:14px;">'
+      +'<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><span style="width:10px;height:10px;background:var(--accent);border-radius:2px;display:inline-block"></span>Returns</span>'
+      +'<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><span style="width:10px;height:10px;background:var(--surface2);border-radius:2px;display:inline-block"></span>Deposited</span>'
+    +'</div>';
+
+  // Milestones
+  const msEl=document.getElementById('proj-milestones');
+  if(msEl) msEl.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">'
+    +milestoneTargets.map(t=>{
+      const mo=milestonesHit[t];
+      const reached=!!mo;
+      const yrs=mo?Math.floor(mo/12):null;
+      const mos=mo?mo%12:null;
+      const label=yrs!=null?(yrs>0?yrs+'y '+(mos?mos+'m':''):(mos+'m')):null;
+      return '<div style="background:'+(reached?'var(--al)':'var(--surface2)')+';border-radius:var(--rs);padding:12px;text-align:center;">'
+        +'<div style="font-size:18px;font-weight:600;color:'+(reached?'var(--accent)':'var(--muted)')+'">$'+(t>=1000000?(t/1000000).toFixed(0)+'M':t>=1000?(t/1000).toFixed(0)+'K':t)+'</div>'
+        +'<div style="font-size:12px;margin-top:4px;color:'+(reached?'var(--accent)':'var(--muted)');+')">'+(reached?'✓ Year '+Math.ceil(mo/12)+(label?' ('+label+')':''):'Beyond '+years+' yr horizon')+'</div>'
+      +'</div>';
+    }).join('')
+  +'</div>';
+
+  // Passive income targets
+  const passEl=document.getElementById('proj-passive');
+  if(passEl) passEl.innerHTML='<div style="overflow-x:auto;"><table><thead><tr><th>Monthly Income Goal</th><th>Portfolio Needed</th><th style="text-align:right">At '+annualRet+'% annual return</th><th>Reached in your projection?</th></tr></thead><tbody>'
+    +passiveTargets.map(monthly_income=>{
+      const needed=monthly_income*12/( annualRet/100);
+      const reached=finalVal>=needed;
+      const reachYear=dataPoints.find(d=>d.value>=needed);
+      return '<tr>'
+        +'<td style="font-weight:500">$'+monthly_income.toLocaleString()+'/mo</td>'
+        +'<td style="color:var(--amber)">$'+Math.round(needed).toLocaleString()+'</td>'
+        +'<td style="text-align:right;color:var(--muted)">$'+(needed/1000).toFixed(0)+'K portfolio</td>'
+        +'<td style="color:'+(reached?'var(--accent)':'var(--muted)')+'">'+( reached?'✓ Year '+(reachYear?.year||years):'Not in '+years+' yr range')+'</td>'
+      +'</tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
+// ── Investment Transaction CRUD ──────────────────────────
+let _itxEditId = null;
+let _itxInvId  = null;
+let _showTxFor = {}; // which investment cards have tx panel open
+
+function buildInvTxSection(inv){
+  const txs = INVESTMENT_TRANSACTIONS
+    .filter(t=>t.investmentId===inv.id)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+
+  const isOpen = !!_showTxFor[inv.id];
+  const count  = txs.length;
+  const iid    = inv.id.replace(/'/g,'');
+
+  let html = '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;">'
+    +'<div class="fb">'
+      +'<button data-action="toggle-tx" data-inv="'+iid+'" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--accent);font-weight:500;padding:0;">'
+        +(isOpen?'▾':'▸')+' Transactions ('+count+')'
+      +'</button>'
+      +'<div class="fi" style="gap:7px;">'
+        +'<button class="btn bp bsm" data-action="add-tx" data-inv="'+iid+'">+ Add</button>'
+        +(count?'<button class="btn bdanger bsm" data-action="reset-tx" data-inv="'+iid+'" data-name="'+inv.name.replace(/"/g,'')+'">🗑 Delete All (+count+)+</button>':'')
+      +'</div>'
+    +'</div>';
+
+  if(isOpen && count){
+    html += '<div style="margin-top:10px;overflow-x:auto;">'
+      +'<table><thead><tr>'
+        +'<th>Date</th><th>Type</th>'
+        +'<th style="text-align:right">Amount</th>'
+        +'<th style="text-align:right">AED</th>'
+        +'<th></th>'
+      +'</tr></thead><tbody>'
+      +txs.map(t=>{
+        const isNeg=t.type==='Fee'||t.type==='Withdrawal';
+        const col=isNeg?'var(--red)':t.type==='Dividend'?'var(--accent)':'var(--text)';
+        const typeBadge={
+          Deposit:'<span class="badge bg" style="font-size:10px">↓ Deposit</span>',
+          Withdrawal:'<span class="badge br" style="font-size:10px">↑ Withdraw</span>',
+          Dividend:'<span class="badge" style="background:#e6f5f3;color:#1a7a6e;font-size:10px">★ Dividend</span>',
+          Fee:'<span class="badge ba" style="font-size:10px">Fee</span>',
+          Investment:'<span class="badge bt" style="font-size:10px">→ Invested</span>',
+          Sell:'<span class="badge" style="background:#f3eefb;color:#6b3fa0;font-size:10px">← Sold</span>',
+        }[t.type]||'<span class="badge bt" style="font-size:10px">'+t.type+'</span>';
+        const tid=t.id.replace(/'/g,'');
+        return '<tr>'
+          +'<td class="sm muted">'+t.date+'</td>'
+          +'<td>'+typeBadge+'</td>'
+          +'<td style="text-align:right;font-weight:500;color:'+col+'">'+t.currency+' '+fmtN(Math.abs(t.amountNative||t.amount||0))+'</td>'
+          +'<td style="text-align:right;color:var(--muted);font-size:12px">'+fmtN(Math.abs(t.amountAED||0))+'</td>'
+          +'<td style="display:flex;gap:4px;">'+'<button data-action="edit-tx" data-inv="'+iid+'" data-tid="'+tid+'" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 5px;" title="Edit">✎</button>'+'<button data-action="del-tx" data-inv="'+iid+'" data-tid="'+tid+'" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px 5px;" title="Delete">✕</button>'+'</td>'
+        +'</tr>';
+      }).join('')
+      +'</tbody></table>'
+    +'</div>';
+  } else if(isOpen && !count){
+    html += '<div class="sm muted" style="padding:8px 0">No transactions yet. Click <strong>+ Add</strong> to record one.</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// Single event delegate on inv-cards div — handles all tx actions
+function handleInvCardClick(e){
+  const btn=e.target.closest('[data-action]');
+  if(!btn) return;
+  const action=btn.dataset.action;
+  const invId=btn.dataset.inv;
+  const txId=btn.dataset.tid||null;
+  const name=btn.dataset.name||'';
+  if(action==='toggle-tx') toggleInvTxPanel(invId);
+  else if(action==='add-tx')   openInvTxModal(invId,null);
+  else if(action==='edit-tx')  openInvTxModal(invId,txId);
+  else if(action==='del-tx')   deleteInvTxDirect(invId,txId);
+  else if(action==='reset-tx') resetInvTxDirect(invId,name);
+}
+
+function toggleInvTxPanel(invId){
+  _showTxFor[invId] = !_showTxFor[invId];
+  renderInvestments();
+}
+
+function openInvTxModal(invId, txId){
+  _itxInvId  = invId;
+  _itxEditId = txId;
+  const inv  = (ACCOUNTS.investments||[]).find(i=>i.id===invId);
+  const tx   = txId ? INVESTMENT_TRANSACTIONS.find(t=>t.id===txId) : null;
+
+  document.getElementById('inv-tx-modal-title').textContent = tx ? 'Edit Transaction' : 'Add Transaction';
+  document.getElementById('itx-delete-btn').style.display  = tx ? 'block' : 'none';
+  document.getElementById('itx-date').value    = tx ? tx.date : getTodayStr();
+  document.getElementById('itx-type').value    = tx ? tx.type : 'Deposit';
+  document.getElementById('itx-amount').value  = tx ? Math.abs(tx.amountNative||tx.amount||0) : '';
+  document.getElementById('itx-note').value    = tx ? (tx.note||'') : '';
+
+  // Currency — default to account currency
+  const cur = tx ? tx.currency : (inv?.currency||'USD');
+  const curSel = document.getElementById('itx-currency');
+  if(curSel){
+    [...curSel.options].forEach(o=>o.selected=o.value===cur);
+  }
+  updateItxAED();
+  if(tx) document.getElementById('itx-amount-aed').value = Math.abs(tx.amountAED||0).toFixed(2);
+
+  document.getElementById('inv-tx-modal').classList.add('show');
+}
+
+function updateItxAED(){
+  const amt    = parseFloat(document.getElementById('itx-amount')?.value)||0;
+  const cur    = document.getElementById('itx-currency')?.value||'AED';
+  const aedVal = toAED(amt, cur);
+  const aedEl  = document.getElementById('itx-amount-aed');
+  const hint   = document.getElementById('itx-rate-hint');
+  if(aedEl) aedEl.value = aedVal.toFixed(2);
+  if(hint)  hint.textContent = cur!=='AED' ? '(rate: 1 '+cur+' = '+fxRate(cur).toFixed(4)+' AED)' : '';
+}
+
+function saveInvTx(){
+  const date     = document.getElementById('itx-date').value;
+  const type     = document.getElementById('itx-type').value;
+  const amtRaw   = parseFloat(document.getElementById('itx-amount').value)||0;
+  const cur      = document.getElementById('itx-currency').value||'AED';
+  const aedOverride = parseFloat(document.getElementById('itx-amount-aed').value)||0;
+  const note     = document.getElementById('itx-note').value.trim();
+
+  if(!date||!amtRaw){ toast('Date and amount are required',true); return; }
+
+  // Fees and withdrawals store as negative
+  const isNeg = type==='Fee'||type==='Withdrawal';
+  const amtNative = isNeg ? -Math.abs(amtRaw) : Math.abs(amtRaw);
+  const amtAED    = isNeg ? -Math.abs(aedOverride||toAED(amtRaw,cur)) : Math.abs(aedOverride||toAED(amtRaw,cur));
+
+  if(_itxEditId){
+    const tx = INVESTMENT_TRANSACTIONS.find(t=>t.id===_itxEditId);
+    if(tx){ Object.assign(tx,{date,type,amountNative:amtNative,currency:cur,amountAED:amtAED,note}); }
+  } else {
+    INVESTMENT_TRANSACTIONS.push({
+      id:'itx'+Date.now()+Math.random().toString(36).slice(2,7),
+      investmentId:_itxInvId, date, type,
+      amountNative:amtNative, currency:cur, amountAED:amtAED, note
+    });
+    // Keep tx panel open after adding
+    _showTxFor[_itxInvId]=true;
+  }
+
+  scheduleSave();
+  closeModal('inv-tx-modal');
+  renderInvestments();
+  toast((type==='Deposit'?'Deposit':type)+' saved ✓');
+}
+
+function deleteInvTx(){
+  if(!_itxEditId) return;
+  const tx = INVESTMENT_TRANSACTIONS.find(t=>t.id===_itxEditId);
+  if(!tx) return;
+  if(!confirm('Delete this '+tx.type+' of '+Math.abs(tx.amountNative||0).toFixed(2)+' '+tx.currency+'?')) return;
+  INVESTMENT_TRANSACTIONS = INVESTMENT_TRANSACTIONS.filter(t=>t.id!==_itxEditId);
+  scheduleSave();
+  closeModal('inv-tx-modal');
+  renderInvestments();
+  toast('Transaction deleted');
+}
+
+function resetInvTx(invId, invName){
+  // invId comes from data-inv attribute — may need trimming
+  const cleanId=(invId||'').trim();
+  const cleanName=(invName||'Unknown').trim();
+  const count = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===cleanId).length;
+  if(!count){
+    // Also check with original id in case whitespace issue
+    const allIds=[...new Set(INVESTMENT_TRANSACTIONS.map(t=>t.investmentId))];
+    console.log('resetInvTx: looking for id='+JSON.stringify(cleanId)+', found ids:',allIds);
+    toast(cleanName+' has no transactions (id: '+cleanId+')',true);
+    return;
+  }
+  if(!confirm('Delete all '+count+' transactions for "'+cleanName+'"? This cannot be undone.')) return;
+  INVESTMENT_TRANSACTIONS = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId!==cleanId);
+  // Also clear any legacy nested transactions
+  const inv=(ACCOUNTS.investments||[]).find(i=>i.id===cleanId);
+  if(inv) inv.transactions=[];
+  _showTxFor[cleanId]=false;
+  scheduleSave();
+  renderInvestments();
+  toast(cleanName+': all transactions deleted ✓');
+}
+
+// ─── FX Rates Panel ──────────────────────────────────────
+const FX_DEFAULTS={USD:3.672,EUR:4.010,GBP:4.680,PKR:0.0132,INR:0.0441,SAR:0.979};
+const FX_FLAGS={USD:'🇺🇸',EUR:'🇪🇺',GBP:'🇬🇧',PKR:'🇵🇰',INR:'🇮🇳',SAR:'🇸🇦'};
+
+function renderFxPanel(){
+  const grid=document.getElementById('fx-rates-grid');
+  const upd=document.getElementById('fx-updated-at');
+  if(!grid) return;
+  if(upd) upd.textContent='Updated: '+(FX_RATES.updatedAt||'—');
+  const currencies=Object.keys(FX_DEFAULTS);
+  grid.innerHTML=currencies.map(cur=>`
+    <div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px;">
+      <div class="fi mb6" style="gap:6px;">
+        <span style="font-size:18px">${FX_FLAGS[cur]||'🌐'}</span>
+        <span style="font-size:14px;font-weight:600">${cur}</span>
+        <span class="sm muted">→ AED</span>
+      </div>
+      <div class="fi" style="gap:4px;align-items:center;">
+        <span class="sm muted">1 ${cur} =</span>
+        <input type="number" id="fx-${cur}" value="${(FX_RATES[cur]||FX_DEFAULTS[cur]).toFixed(4)}"
+          step="0.0001" style="width:80px;font-size:13px;padding:3px 6px;font-family:monospace;">
+        <span class="sm muted">AED</span>
+      </div>
+    </div>`).join('');
+}
+
+function saveFxRates(){
+  const currencies=Object.keys(FX_DEFAULTS);
+  currencies.forEach(cur=>{
+    const val=parseFloat(document.getElementById('fx-'+cur)?.value);
+    if(val>0) FX_RATES[cur]=val;
+  });
+  FX_RATES.updatedAt=getTodayStr();
+  scheduleSave();
+  renderFxPanel();
+  const msg=document.getElementById('fx-save-msg');
+  if(msg){ msg.style.display='block'; msg.textContent='✓ Rates saved — net worth and investments will use updated rates'; }
+  toast('Exchange rates updated ✓');
+}
+
+function resetFxRates(){
+  Object.assign(FX_RATES, FX_DEFAULTS);
+  FX_RATES.updatedAt=getTodayStr();
+  renderFxPanel();
+  toast('Reset to defaults');
 }
 
 function saveApiKey(){
@@ -3349,7 +5268,7 @@ function getSnapshot() {
     version: 5,
     savedAt: new Date().toISOString(),
     CATS, BUDGETS, OBLIGATIONS, ACCOUNTS, INCOME,
-    TRANSACTIONS, INSIGHT_HISTORY,
+    TRANSACTIONS, INVESTMENT_TRANSACTIONS, INSIGHT_HISTORY,
   };
 }
 
@@ -3362,6 +5281,8 @@ function applySnapshot(snap) {
     if (Array.isArray(snap.OBLIGATIONS))                      OBLIGATIONS   = snap.OBLIGATIONS;
     if (snap.ACCOUNTS?.banks)                                 ACCOUNTS      = snap.ACCOUNTS;
     if (snap.INCOME)                                          INCOME        = snap.INCOME;
+    if (snap.FX_RATES)                                        Object.assign(FX_RATES, snap.FX_RATES);
+    if (Array.isArray(snap.INVESTMENT_TRANSACTIONS))          INVESTMENT_TRANSACTIONS = snap.INVESTMENT_TRANSACTIONS;
     if (Array.isArray(snap.TRANSACTIONS))                     TRANSACTIONS  = snap.TRANSACTIONS;
     if (Array.isArray(snap.INSIGHT_HISTORY))                  INSIGHT_HISTORY = snap.INSIGHT_HISTORY;
     return true;
@@ -3574,7 +5495,7 @@ const _origSwitchAdmin = switchAdmin;
 switchAdmin = function(tab) {
   _origSwitchAdmin(tab);
   if (tab === 'data') { renderSaveStatus(); renderDriveStatus(); }
-  if (tab === 'api') { renderApiPanel(); }
+  if (tab === 'api') { renderApiPanel(); renderFxPanel(); }
 };
 
 
@@ -3991,6 +5912,8 @@ function pinDisable(){}
 (function init() {
   // Always load from localStorage first — fast, works offline
   const restored = loadFromStorage();
+  migrateInvestmentTx(); // Move any nested inv.transactions to flat store
+  repairInvestmentTx();   // Fix any misassigned transactions
 
   // Set period to most recent month with data
   const now = new Date();
@@ -4047,6 +5970,34 @@ function pinDisable(){}
       showAuthScreen();
     }
   }, 200);
+function updateBankModalRate(currency){
+  const row=document.getElementById('em-rate-row');
+  const curSpan=document.getElementById('em-rate-cur');
+  const rateInput=document.getElementById('em-fxrate');
+  if(!row) return;
+  if(currency&&currency!=='AED'){
+    row.style.display='block';
+    if(curSpan) curSpan.textContent=currency;
+    if(rateInput) rateInput.value=fxRate(currency).toFixed(4);
+  } else { row.style.display='none'; }
+}
+
+function toggleCardSelect(){
+  const src=document.getElementById('nt-src')?.value;
+  const row=document.getElementById('nt-card-row');
+  if(!row) return;
+  if(src==='credit_card'&&(ACCOUNTS.cards||[]).length){
+    row.style.display='block';
+    const sel=document.getElementById('nt-card-id');
+    if(sel) sel.innerHTML=(ACCOUNTS.cards||[]).map(c=>'<option value="'+c.id+'">'+c.name+'</option>').join('');
+  } else { row.style.display='none'; }
+}
+
+function setBnActive(id){
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById(id);if(el)el.classList.add('active');
+}
+
 })();
 </script>
 </body>
