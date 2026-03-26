@@ -196,6 +196,13 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
 .pin-msg{font-size:13px;color:var(--red);min-height:18px;margin-bottom:10px;}
 .pin-setup-wrap{max-width:320px;width:100%;text-align:center;}
 
+
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;}
+.confirm-box{background:var(--surface);border-radius:var(--r);padding:24px;max-width:380px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.2);}
+.confirm-title{font-size:16px;font-weight:600;margin-bottom:8px;}
+.confirm-msg{font-size:13.5px;color:var(--muted);line-height:1.7;margin-bottom:20px;}
+.confirm-btns{display:flex;gap:9px;justify-content:flex-end;}
+
 ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
 
@@ -300,6 +307,18 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
   </div>
 </div>
 
+
+<!-- Custom Confirm Dialog (replaces browser confirm()) -->
+<div id="custom-confirm" class="confirm-overlay" style="display:none;">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Are you sure?</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="btn bg_" onclick="confirmReject()">Cancel</button>
+      <button class="btn bdanger" id="confirm-ok-btn" onclick="confirmAccept()">Confirm</button>
+    </div>
+  </div>
+</div>
 
 <div class="loading" id="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--muted)">Analysing…</div></div>
 <button class="hamburger" onclick="toggleSidebar()">☰</button>
@@ -420,47 +439,48 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
 
   <!-- Fast expense entry -->
   <div class="card sg" id="today-quick-add">
-    <!-- Date navigator -->
-    <div class="fb mb12">
-      <div class="ct" style="margin:0">Quick Add Expense</div>
-      <div class="period-nav">
-        <button class="pnbtn" onclick="changeTodayDate(-1)">‹</button>
-        <span class="pnlbl" id="today-date-lbl" style="min-width:110px;font-size:13px;"></span>
-        <button class="pnbtn" onclick="changeTodayDate(1)">›</button>
-        <button class="btn bsm bg_" onclick="resetTodayDate()" id="today-date-reset" style="display:none;">Today</button>
-      </div>
+    <!-- Single line: amount + expand toggle + add button -->
+    <div style="display:flex;gap:10px;align-items:center;">
+      <input type="number" id="today-amount" placeholder="0.00" step="0.01"
+        style="flex:1;font-size:28px;font-weight:700;border:none;border-bottom:2px solid var(--border);border-radius:0;padding:4px 0;outline:none;background:transparent;color:var(--text);"
+        oninput="updateTodayDesc()"
+        onkeydown="if(event.key==='Enter')addTodayExpense()">
+      <button onclick="toggleTodayExpand()" id="today-expand-btn"
+        style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);padding:4px 2px;white-space:nowrap;flex-shrink:0;">
+        <span id="today-expand-label">⋯</span>
+      </button>
+      <button class="btn bp" onclick="addTodayExpense()" style="padding:9px 20px;font-size:15px;font-weight:600;flex-shrink:0;">Add</button>
     </div>
-    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
-      <div style="flex:1;min-width:120px;">
-        <label class="lbl">Amount (AED)</label>
-        <input type="number" id="today-amount" placeholder="0.00" step="0.01" style="font-size:20px;font-weight:600;margin-top:4px;" oninput="updateTodayDesc()">
-      </div>
-      <div style="flex:2;min-width:160px;">
-        <label class="lbl">Description (optional)</label>
-        <input type="text" id="today-desc" placeholder="e.g. Carrefour" style="margin-top:4px;">
-      </div>
-    </div>
-    <!-- Category quick-pick buttons — all categories, essential flagged -->
-    <div class="fb mb8">
-      <div class="lbl" style="margin:0">Category</div>
-      <div class="fi" style="gap:6px;">
+
+    <!-- Expandable: category, description, method, date -->
+    <div id="today-extras" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+      <!-- Category filter + grid -->
+      <div class="fi mb8" style="gap:6px;">
         <span class="chip active" id="today-cat-filter-all" onclick="setTodayCatFilter('all',this)" style="font-size:11px;padding:3px 9px;">All</span>
         <span class="chip" id="today-cat-filter-ess" onclick="setTodayCatFilter('essential',this)" style="font-size:11px;padding:3px 9px;">Essential</span>
       </div>
-    </div>
-    <div id="today-cat-grid" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;"></div>
-    <!-- Method -->
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <div>
-        <label class="lbl">Method</label>
-        <select id="today-method" style="margin-top:4px;">
-          <option value="credit_card">💳 Credit Card</option>
-          <option value="cash">💵 Cash</option>
-          <option value="bank">🏦 Bank</option>
-        </select>
+      <div id="today-cat-grid" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;"></div>
+      <!-- Description + method -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div>
+          <label class="lbl">Description</label>
+          <input type="text" id="today-desc" placeholder="e.g. Carrefour" style="margin-top:4px;">
+        </div>
+        <div>
+          <label class="lbl">Method</label>
+          <select id="today-method" style="margin-top:4px;width:100%;">
+            <option value="credit_card">💳 Credit Card</option>
+            <option value="cash">💵 Cash</option>
+            <option value="bank">🏦 Bank</option>
+          </select>
+        </div>
       </div>
-      <div style="margin-top:18px;">
-        <button class="btn bp" onclick="addTodayExpense()" style="padding:9px 22px;font-size:15px;">Add Expense</button>
+      <!-- Date navigator -->
+      <div class="fi" style="gap:8px;align-items:center;">
+        <button class="pnbtn" onclick="changeTodayDate(-1)">‹</button>
+        <span class="pnlbl" id="today-date-lbl" style="min-width:100px;font-size:13px;text-align:center;"></span>
+        <button class="pnbtn" onclick="changeTodayDate(1)">›</button>
+        <button class="btn bsm bg_" onclick="resetTodayDate()" id="today-date-reset" style="display:none;">Today</button>
       </div>
     </div>
   </div>
@@ -573,6 +593,7 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
     <div><div class="pt">Investments</div><div class="ps">Factual · Analysis · Projections</div></div>
     <div class="fi" style="gap:8px;">
       <button class="btn bp bsm" onclick="openImportInvestmentModal()">⬆ Import</button>
+      <button class="btn bdanger bsm" onclick="hardResetInvestments()">🔄 Reset All</button>
       <button class="btn bg_ bsm" onclick="debugInvTx()">🔍 Debug</button>
       <button class="btn bo bsm" onclick="nav('admin',null);setTimeout(()=>switchAdmin('accounts'),50)">Edit ↗</button>
       <button class="bell-btn" onclick="toggleHub()" title="AI Suggestions"><span>🔔</span></button>
@@ -1371,6 +1392,19 @@ textarea{width:100%;border:1px solid var(--border);border-radius:var(--rs);paddi
       </div>
     </div>
 
+    <!-- Data version notice -->
+    <div class="card sg" id="data-version-notice" style="background:var(--ambl);border:1px solid var(--amber);">
+      <div class="fb mb8">
+        <div class="ct" style="margin:0;color:#7a5a1a">⚠ Storage Updated to v6</div>
+      </div>
+      <div class="sm mb12" style="color:#7a5a1a;line-height:1.7">
+        This version fixes investment currency handling and removes placeholder accounts.
+        If your data looks wrong, use <strong>Load from Drive</strong> to restore your backup,
+        or <strong>Import JSON</strong> if you exported one previously.
+      </div>
+      <button class="btn bg_" onclick="document.getElementById('data-version-notice').style.display='none'">Dismiss</button>
+    </div>
+
     <!-- Local storage -->
     <div class="g2 sg">
       <div class="card">
@@ -1477,11 +1511,7 @@ let ACCOUNTS={
     {id:'b3',name:'Meezan Bank — Lahore',number:'****9012',balance:85000,currency:'PKR',type:'savings'},
   ],
   investments:[
-    {id:'i1',name:'Serva Portfolio',platform:'Serva',value:15000,monthly_return:1500,
-     currency:'AED',transactions:[]},
-    {id:'i2',name:'Gold Holdings',platform:'Physical',value:5000,monthly_return:0,
-     currency:'AED',transactions:[]},
-    {id:'i3',name:'Sarwa',platform:'Sarwa',value:7567.87,monthly_return:0,
+    {id:'i3',name:'Sarwa (Robo)',platform:'Sarwa',value:7567.87,
      currency:'USD',transactions:[
       {date:'2024-09-23',type:'Deposit',amount:543.14},
       {date:'2024-09-24',type:'Investment',amount:463.21},
@@ -1562,7 +1592,7 @@ let ACCOUNTS={
   liabilities:[]
 };
 
-let INCOME={salary:17000,serva:1500,other:0};
+let INCOME={salary:17000,serva:0,other:0}; // serva field kept for compatibility
 
 // FX rates — AED is base currency (1 AED = X foreign)
 // Store as how many AED 1 unit of foreign currency buys
@@ -1588,7 +1618,7 @@ let TRANSACTIONS=[
   {id:9,date:'2025-03-12',desc:'Aster Pharmacy',cat:'health',amount:88.50,type:'expense',source:'credit_card'},
   {id:10,date:'2025-03-11',desc:'Western Union — Lahore',cat:'remittance',amount:500.00,type:'expense',source:'bank'},
   {id:11,date:'2025-03-01',desc:'Monthly Salary',cat:'income',amount:17000,type:'income',source:'bank'},
-  {id:12,date:'2025-03-05',desc:'Serva Returns',cat:'income',amount:1500,type:'income',source:'bank'},
+  {id:12,date:'2025-03-05',desc:'Investment Returns (monthly)',cat:'income',amount:1500,type:'income',source:'bank'},
   {id:13,date:'2025-03-10',desc:'Spinneys',cat:'grocery',amount:196.40,type:'expense',source:'credit_card'},
   {id:14,date:'2025-03-08',desc:'Du Mobile',cat:'internet_personal',amount:119.00,type:'expense',source:'credit_card'},
   {id:15,date:'2025-03-07',desc:'CeraVe Moisturiser',cat:'skincare',amount:78.00,type:'expense',source:'credit_card'},
@@ -1672,56 +1702,62 @@ function calcFloor(){
 let INVESTMENT_TRANSACTIONS = [];
 
 // Migrate nested inv.transactions to flat store on first load
-function migrateInvestmentTx(){
-  (ACCOUNTS.investments||[]).forEach(inv=>{
-    const existing=(inv.transactions||[]);
-    if(!existing.length) return;
-    existing.forEach(t=>{
-      // Check not already migrated for THIS investment
-      const alreadyMigrated=INVESTMENT_TRANSACTIONS.find(x=>
-        x.investmentId===inv.id &&
-        x.date===t.date &&
-        x.type===t.type &&
-        Math.abs((x.amountNative||0)-t.amount)<0.01
-      );
-      if(alreadyMigrated) return;
-      const cur=t.currency||inv.currency||'AED';
-      INVESTMENT_TRANSACTIONS.push({
-        id:'itx'+Date.now()+Math.random().toString(36).slice(2,6),
-        investmentId:inv.id,
-        date:t.date,
-        type:t.type,
-        amountNative:t.amount,
-        currency:cur,
-        amountAED:toAED(t.amount,cur),
-        note:t.note||''
+function cleanAndMigrateInvestmentTx(){
+  // Step 1: Clear ALL existing flat transactions — we'll rebuild from nested data
+  // This forces a clean migration every time, removing any stale/misassigned data
+  // We only do this if there are nested transactions to migrate (i.e. fresh data)
+  const hasNested = (ACCOUNTS.investments||[]).some(i=>(i.transactions||[]).length>0);
+
+  if(hasNested){
+    // Full reset and rebuild from nested data (the source of truth)
+    INVESTMENT_TRANSACTIONS = [];
+    (ACCOUNTS.investments||[]).forEach(inv=>{
+      const existing = inv.transactions||[];
+      existing.forEach(t=>{
+        const cur = t.currency || inv.currency || 'AED';
+        INVESTMENT_TRANSACTIONS.push({
+          id: 'itx'+Date.now()+Math.random().toString(36).slice(2,7),
+          investmentId: inv.id,
+          date: t.date,
+          type: t.type,
+          amountNative: t.amount,
+          currency: cur,
+          amountAED: toAED(t.amount, cur),
+          note: t.note||''
+        });
       });
+      inv.transactions = []; // clear nested after migration
     });
-    // Clear nested after migration
-    inv.transactions=[];
+    return;
+  }
+
+  // Normalise 'Income' → 'Dividend' for any existing transactions
+  INVESTMENT_TRANSACTIONS.forEach(t=>{
+    if(t.type==='Income') t.type='Dividend';
+  });
+
+  // Step 2: If no nested data, repair any misassigned transactions
+  // Sarwa = i3 (USD), Serva = i1 (AED)
+  const sarwa = (ACCOUNTS.investments||[]).find(i=>i.platform==='Sarwa'||i.name==='Sarwa');
+  const serva = (ACCOUNTS.investments||[]).find(i=>i.name==='Serva Portfolio');
+  if(!sarwa||!serva) return;
+
+  // Any USD transactions assigned to Serva (AED account) are Sarwa's
+  INVESTMENT_TRANSACTIONS.forEach(t=>{
+    if(t.investmentId===serva.id && t.currency==='USD'){
+      t.investmentId = sarwa.id;
+    }
+    // Also fix AED amounts that should be USD — if assigned to Sarwa
+    // and amountNative matches Sarwa transaction amounts, fix currency
+    if(t.investmentId===sarwa.id && t.currency==='AED' && !t._currencyFixed){
+      // Sarwa transactions are in USD — convert
+      t.currency = 'USD';
+      t.amountAED = toAED(t.amountNative, 'USD');
+      t._currencyFixed = true;
+    }
   });
 }
 
-// Repair: detect transactions assigned to wrong investment account
-// Sarwa transactions should be on i3, not i1/i2
-function repairInvestmentTx(){
-  const sarwa=(ACCOUNTS.investments||[]).find(i=>i.name==='Sarwa');
-  const serva=(ACCOUNTS.investments||[]).find(i=>i.name==='Serva Portfolio');
-  if(!sarwa||!serva) return;
-
-  // If serva has many transactions but serva.transactions[] is empty,
-  // those are likely Sarwa's migrated incorrectly
-  const servaFlatCount=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===serva.id).length;
-  const sarwaFlatCount=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===sarwa.id).length;
-
-  // Heuristic: Sarwa trades in USD; Serva is AED
-  // If serva has USD transactions, they're almost certainly Sarwa's
-  const servaUsdTx=INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===serva.id&&t.currency==='USD');
-  if(servaUsdTx.length>0){
-    console.log('Repairing '+servaUsdTx.length+' USD transactions misassigned to Serva → moving to Sarwa');
-    servaUsdTx.forEach(t=>{ t.investmentId=sarwa.id; });
-  }
-}
 
 // ─── Currency helpers ────────────────────────────────────────
 function toAED(amount, currency){
@@ -1743,7 +1779,7 @@ function calcNW(){
   let liq=0;
   (ACCOUNTS.cash||[]).forEach(c=>{liq+=c.balance||0;});
   ACCOUNTS.banks.forEach(b=>{liq+=toAED(b.balance,b.currency);});
-  ACCOUNTS.investments.forEach(i=>{liq+=i.value;});
+  ACCOUNTS.investments.forEach(i=>{liq+=toAED(i.value||0, i.currency||'AED');});
   const prop=ACCOUNTS.properties.reduce((s,p)=>s+p.est_value_aed,0);
   const liab=ACCOUNTS.liabilities.reduce((s,l)=>s+l.amount,0);
   return{liquid:Math.round(liq),properties:prop,assets:Math.round(liq+prop),liabilities:liab,net:Math.round(liq+prop-liab)};
@@ -2064,6 +2100,15 @@ function periodLabel(mode,m,y){return mode==='monthly'?MN[m]+' '+y:mode==='quart
 // ═══════════════════════════════════════════════════════════
 // TODAY PAGE
 // ═══════════════════════════════════════════════════════════
+function toggleTodayExpand(){
+  const el  = document.getElementById('today-extras');
+  const btn = document.getElementById('today-expand-label');
+  if(!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if(btn) btn.textContent = open ? '+ more options' : '− less';
+}
+
 function changeTodayDate(d){
   // Parse date parts directly to avoid timezone shift
   const [y,m,day]=todayDate.split('-').map(Number);
@@ -2802,7 +2847,7 @@ function renderNetWorth(){
   lR+=`<div class="divider"></div><div class="ct mb4">Net Worth</div><div style="font-size:24px;font-weight:600;color:var(--accent)">${fmt(nw.net)}</div><div class="sm muted mt4">Liquid ${fmt(nw.liquid)} · Property ${fmt(nw.properties)}</div>`;
   document.getElementById('nw-liab').innerHTML=lR;
   const bA=(ACCOUNTS.cash||[]).reduce((s,c)=>s+(c.balance||0),0)+ACCOUNTS.banks.reduce((s,b)=>s+(toAED(b.balance,b.currency)),0);
-  const iA=ACCOUNTS.investments.reduce((s,i)=>s+i.value,0),tot=nw.assets,bp=Math.round(bA/tot*100),ip=Math.round(iA/tot*100),pp=100-bp-ip;
+  const iA=ACCOUNTS.investments.reduce((s,i)=>s+toAED(i.value||0,i.currency||'AED'),0),tot=nw.assets,bp=Math.round(bA/tot*100),ip=Math.round(iA/tot*100),pp=100-bp-ip;
   document.getElementById('nw-bar').innerHTML=`<div style="display:flex;height:18px;border-radius:5px;overflow:hidden;margin-bottom:10px"><div style="width:${bp}%;background:var(--accent)"></div><div style="width:${ip}%;background:var(--amber)"></div><div style="width:${pp}%;background:var(--blue)"></div></div><div style="display:flex;gap:14px;font-size:12px;color:var(--muted)"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--accent);margin-right:4px"></span>Banks ${bp}%</span><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--amber);margin-right:4px"></span>Investments ${ip}%</span><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--blue);margin-right:4px"></span>Property ${pp}%</span></div><div class="tip mt12">Your Lahore house (${pp}% of net worth) earns no current return but is an appreciating asset providing family security. Update the AED estimate when PKR/AED rate changes significantly.</div>`;
 }
 
@@ -3868,7 +3913,7 @@ function calcInvPL(inv){
   const amt=t=>(t.amountNative!==undefined?t.amountNative:t.amount)||0;
   const deposited  = txs.filter(t=>t.type==='Deposit').reduce((s,t)=>s+amt(t),0);
   const withdrawn  = Math.abs(txs.filter(t=>t.type==='Withdrawal').reduce((s,t)=>s+amt(t),0));
-  const dividends  = txs.filter(t=>t.type==='Dividend').reduce((s,t)=>s+amt(t),0);
+  const dividends  = txs.filter(t=>t.type==='Dividend'||t.type==='Income').reduce((s,t)=>s+amt(t),0);
   const fees       = txs.filter(t=>t.type==='Fee').reduce((s,t)=>s+amt(t),0);
   const sells      = txs.filter(t=>t.type==='Sell').reduce((s,t)=>s+amt(t),0);
 
@@ -3882,7 +3927,7 @@ function calcInvPL(inv){
     const a=(t.amountNative!==undefined?t.amountNative:t.amount)||0;
     if(t.type==='Deposit') phDeposited += a;
     if(t.type==='Withdrawal'){ phWithdrawn += Math.abs(a); }
-    if(t.type==='Dividend') phDivs += a;
+    if(t.type==='Dividend'||t.type==='Income') phDivs += a;
     if(t.type==='Fee') phFees += a;
     if(t.type==='Withdrawal' && Math.abs(t.amount) > 100){
       const phPL = phWithdrawn - phDeposited + phDivs + phFees;
@@ -3937,9 +3982,9 @@ function renderInvestments(){
   invs.forEach(inv=>{
     const pl=calcInvPL(inv);
     const r=fxRate(inv.currency);
-    totalCurrentAED  +=(inv.value||0)*r;
-    totalInvestedAED += pl.deposited*r;
-    totalPLAED       += pl.totalPL*r;
+    totalCurrentAED  += toAED(inv.value||0, inv.currency||'AED');
+    totalInvestedAED += toAED(pl.deposited, inv.currency||'AED');
+    totalPLAED       += toAED(pl.totalPL, inv.currency||'AED');
   });
   // Also simple investments (no tx history)
   ACCOUNTS.investments.filter(i=>!(i.transactions||[]).length).forEach(i=>{
@@ -4007,10 +4052,10 @@ function renderInvestments(){
       +'<div class="fb mb10">'
         +'<div>'
           +'<div style="font-size:16px;font-weight:600">'+inv.name+'</div>'
-          +'<div class="sm muted">'+inv.platform+' · '+inv.currency+(inv.currency!=='AED'?' (×'+fxRate(inv.currency).toFixed(3)+' AED)':'')+'</div>'
+          +'<div class="sm muted">'+inv.platform+(inv.currency&&inv.currency!=='AED'?' · '+inv.currency+' (×'+fxRate(inv.currency).toFixed(3)+' AED)':'')+'</div>'
         +'</div>'
         +'<div style="text-align:right">'
-          +'<div style="font-size:22px;font-weight:600;color:var(--accent)">'+(inv.currency==='USD'?'$'+fmtN(inv.value||0):fmt(inv.value||0))+'</div>'
+          +'<div style="font-size:22px;font-weight:600;color:var(--accent)">'+(inv.currency&&inv.currency!=='AED'?inv.currency+' '+fmtN(inv.value||0)+' <span style="font-size:13px;color:var(--muted)">= '+fmt(toAED(inv.value||0,inv.currency))+'</span>':fmt(inv.value||0))+'</div>'
           +'<div class="sm muted">current value</div>'
         +'</div>'
       +'</div>'
@@ -4120,7 +4165,12 @@ function handleInvestmentImport(event){
       return;
     }
 
-    pendingInvestmentImport=rows.slice(headerIdx+1).map(r=>{
+        // Type normalisation — Sarwa Excel uses "Income" for dividends
+        const TYPE_MAP={'income':'Dividend','dividend':'Dividend','deposit':'Deposit',
+          'deposits received':'Deposit','withdrawal':'Withdrawal','funds withdrawn':'Withdrawal',
+          'fee':'Fee','investment':'Investment','funds invested':'Investment',
+          'sell':'Sell','assets sold':'Sell'};
+        pendingInvestmentImport=rows.slice(headerIdx+1).map(r=>{
       if(!r[typeCol]||!r[amtCol]) return null;
       const rawDate=r[dateCol]+'';
       let isoDate=getTodayStr();
@@ -4132,7 +4182,8 @@ function handleInvestmentImport(event){
         }
       }catch(ex){}
       const amt=parseFloat((r[amtCol]+'').replace(/[,$]/g,''))||0;
-      const type=(r[typeCol]+'').trim();
+      const rawType=(r[typeCol]+'').trim();
+      const type=TYPE_MAP[rawType.toLowerCase()]||rawType;
       if(!type||amt===0) return null;
       return {date:isoDate,type,amount:amt};
     }).filter(Boolean);
@@ -4498,18 +4549,23 @@ function getApiKey(){
   return localStorage.getItem(API_KEY_STORAGE) || '';
 }
 
-function deleteInvTxDirect(invId, txId){
+async function deleteInvTxDirect(invId, txId){
   const idx = INVESTMENT_TRANSACTIONS.findIndex(t=>t.id===txId);
   if(idx===-1){ toast('Transaction not found',true); return; }
   const tx = INVESTMENT_TRANSACTIONS[idx];
-  if(!confirm('Delete '+tx.type+' of '+Math.abs(tx.amountNative||0).toFixed(2)+' '+tx.currency+' on '+tx.date+'?')) return;
+  const ok3 = await showConfirm(
+    'Delete Transaction',
+    'Delete '+tx.type+' of <strong>'+Math.abs(tx.amountNative||0).toFixed(2)+' '+tx.currency+'</strong> on '+tx.date+'?',
+    'Delete', true
+  );
+  if(!ok3) return;
   INVESTMENT_TRANSACTIONS.splice(idx,1);
   scheduleSave();
   renderInvestments();
   toast('Deleted ✓');
 }
 
-function resetInvTxDirect(invId, invName){
+async function resetInvTxDirect(invId, invName){
   // Find all matching — try exact id first, then by name if id fails
   let matching = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId===invId);
   if(!matching.length){
@@ -4519,7 +4575,12 @@ function resetInvTxDirect(invId, invName){
   }
   const count=matching.length;
   if(!count){ toast('No transactions found for '+invName,true); return; }
-  if(!confirm('Delete ALL '+count+' transactions for '+invName+'? This cannot be undone.')) return;
+  const ok2 = await showConfirm(
+    'Delete All Transactions',
+    'Delete all <strong>'+count+'</strong> transactions for <strong>'+invName+'</strong>?<br><br>This cannot be undone.',
+    'Delete All', true
+  );
+  if(!ok2) return;
 
   // Remove by txId rather than filtering by investmentId (more reliable)
   const txIds=new Set(matching.map(t=>t.id));
@@ -4531,6 +4592,48 @@ function resetInvTxDirect(invId, invName){
   scheduleSave();
   renderInvestments();
   toast(invName+': '+count+' transactions deleted ✓');
+}
+
+// ── Custom confirm (replaces browser confirm() blocked in sandboxes) ──
+let _confirmResolve = null;
+
+function showConfirm(title, msg, okLabel='Confirm', danger=true){
+  return new Promise(resolve=>{
+    _confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').innerHTML = msg;
+    const btn = document.getElementById('confirm-ok-btn');
+    btn.textContent = okLabel;
+    btn.className = danger ? 'btn bdanger' : 'btn bp';
+    document.getElementById('custom-confirm').style.display = 'flex';
+  });
+}
+function confirmAccept(){
+  document.getElementById('custom-confirm').style.display = 'none';
+  if(_confirmResolve){ _confirmResolve(true); _confirmResolve=null; }
+}
+function confirmReject(){
+  document.getElementById('custom-confirm').style.display = 'none';
+  if(_confirmResolve){ _confirmResolve(false); _confirmResolve=null; }
+}
+
+async function hardResetInvestments(){
+  const ok = await showConfirm(
+    'Reset All Investment Transactions',
+    'This will clear <strong>all</strong> investment transaction data for every account.<br><br>Your account details (names, values) are kept.<br>You can import fresh data afterwards.<br><br><strong>Cannot be undone.</strong>',
+    'Reset All', true
+  );
+  if(!ok) return;
+
+  INVESTMENT_TRANSACTIONS = [];
+  (ACCOUNTS.investments||[]).forEach(inv=>{ inv.transactions=[]; });
+  try{
+    const snap = getSnapshot();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snap));
+  } catch(e){ console.error('localStorage save failed:', e); }
+  if(googleToken) driveSyncNow(true);
+  renderInvestments();
+  toast('Investment transactions cleared ✓');
 }
 
 function debugInvTx(){
@@ -4783,7 +4886,7 @@ function buildInvTxSection(inv){
       +'</button>'
       +'<div class="fi" style="gap:7px;">'
         +'<button class="btn bp bsm" data-action="add-tx" data-inv="'+iid+'">+ Add</button>'
-        +(count?'<button class="btn bdanger bsm" data-action="reset-tx" data-inv="'+iid+'" data-name="'+inv.name.replace(/"/g,'')+'">🗑 Delete All (+count+)+</button>':'')
+        +(count?'<button class="btn bdanger bsm" data-action="reset-tx" data-inv="'+iid+'" data-name="'+inv.name.replace(/"/g,'')+'">🗑 Delete All ('+count+')</button>':'')
       +'</div>'
     +'</div>';
 
@@ -4802,6 +4905,7 @@ function buildInvTxSection(inv){
           Deposit:'<span class="badge bg" style="font-size:10px">↓ Deposit</span>',
           Withdrawal:'<span class="badge br" style="font-size:10px">↑ Withdraw</span>',
           Dividend:'<span class="badge" style="background:#e6f5f3;color:#1a7a6e;font-size:10px">★ Dividend</span>',
+          Income:'<span class="badge" style="background:#e6f5f3;color:#1a7a6e;font-size:10px">★ Dividend</span>',
           Fee:'<span class="badge ba" style="font-size:10px">Fee</span>',
           Investment:'<span class="badge bt" style="font-size:10px">→ Invested</span>',
           Sell:'<span class="badge" style="background:#f3eefb;color:#6b3fa0;font-size:10px">← Sold</span>',
@@ -4882,7 +4986,8 @@ function updateItxAED(){
 
 function saveInvTx(){
   const date     = document.getElementById('itx-date').value;
-  const type     = document.getElementById('itx-type').value;
+  const rawType  = document.getElementById('itx-type').value;
+  const type     = (rawType==='Income')?'Dividend':rawType; // normalise Income→Dividend
   const amtRaw   = parseFloat(document.getElementById('itx-amount').value)||0;
   const cur      = document.getElementById('itx-currency').value||'AED';
   const aedOverride = parseFloat(document.getElementById('itx-amount-aed').value)||0;
@@ -4914,11 +5019,12 @@ function saveInvTx(){
   toast((type==='Deposit'?'Deposit':type)+' saved ✓');
 }
 
-function deleteInvTx(){
+async function deleteInvTx(){
   if(!_itxEditId) return;
   const tx = INVESTMENT_TRANSACTIONS.find(t=>t.id===_itxEditId);
   if(!tx) return;
-  if(!confirm('Delete this '+tx.type+' of '+Math.abs(tx.amountNative||0).toFixed(2)+' '+tx.currency+'?')) return;
+  const ok4 = await showConfirm('Delete Transaction','Delete '+tx.type+' of <strong>'+Math.abs(tx.amountNative||0).toFixed(2)+' '+tx.currency+'</strong>?','Delete',true);
+  if(!ok4) return;
   INVESTMENT_TRANSACTIONS = INVESTMENT_TRANSACTIONS.filter(t=>t.id!==_itxEditId);
   scheduleSave();
   closeModal('inv-tx-modal');
@@ -4926,7 +5032,7 @@ function deleteInvTx(){
   toast('Transaction deleted');
 }
 
-function resetInvTx(invId, invName){
+async function resetInvTx(invId, invName){
   // invId comes from data-inv attribute — may need trimming
   const cleanId=(invId||'').trim();
   const cleanName=(invName||'Unknown').trim();
@@ -4938,7 +5044,8 @@ function resetInvTx(invId, invName){
     toast(cleanName+' has no transactions (id: '+cleanId+')',true);
     return;
   }
-  if(!confirm('Delete all '+count+' transactions for "'+cleanName+'"? This cannot be undone.')) return;
+  const ok5 = await showConfirm('Delete All Transactions','Delete all <strong>'+count+'</strong> transactions for <strong>'+cleanName+'</strong>? This cannot be undone.','Delete All',true);
+  if(!ok5) return;
   INVESTMENT_TRANSACTIONS = INVESTMENT_TRANSACTIONS.filter(t=>t.investmentId!==cleanId);
   // Also clear any legacy nested transactions
   const inv=(ACCOUNTS.investments||[]).find(i=>i.id===cleanId);
@@ -5258,7 +5365,7 @@ function confirmBankImport(){
 // ═══════════════════════════════════════════════════════════
 // PERSISTENCE — localStorage auto-save + JSON export/import
 // ═══════════════════════════════════════════════════════════
-const STORAGE_KEY = 'mizan_v5_data';
+const STORAGE_KEY = 'mizan_v6_data'; // v6: removes demo investments, fixes USD conversion
 let _lastSaveTime = null;
 let _autoSaveTimer = null;
 
@@ -5912,8 +6019,8 @@ function pinDisable(){}
 (function init() {
   // Always load from localStorage first — fast, works offline
   const restored = loadFromStorage();
-  migrateInvestmentTx(); // Move any nested inv.transactions to flat store
-  repairInvestmentTx();   // Fix any misassigned transactions
+  // Clean investment transactions on load
+  cleanAndMigrateInvestmentTx();
 
   // Set period to most recent month with data
   const now = new Date();
